@@ -13,6 +13,11 @@ int ChemThermo::speciesIndex(const std::string& name) const
     return gas_.speciesIndex(name);
 }
 
+std::string ChemThermo::speciesName(const int& k) const
+{
+    return gas_.speciesName(k);
+}
+
 double ChemThermo::sutherland(const double& T) const
 {
     const double As = 1.67212e-6;

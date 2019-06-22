@@ -38,20 +38,29 @@ int main()
     const double YN2Air = 0.75425;
     const double YARAir = 0.01378;
     const double YFUEL = 1.0;
-    const double YL = 1.0;
-    const double YR = 0.0;
+    vector<double> YL;
+    vector<double> YR;
+
 
     // Output
     ofstream fout("output.csv");
+    const size_t WIDTH = 18;
 
     // Solution and initial conditions
     const double p0 = 101325.0;
     ChemThermo gas("Ethanol_31.cti", p0);
     const int nsp = gas.nsp();  // number of species
     VectorXd u(nx);  // x-direction velocity [m/s]
-    VectorXd V(nx);  // v/y [1/s]
+    VectorXd V(nx);  // v/y = dv/dy [1/s]
     VectorXd T(nx);  // temperature [K]
     vector<VectorXd> Y(nsp);  // species mass fractions [-]
+    YL.resize(nsp, 0.0);
+    YR.resize(nsp, 0.0);
+    YL[gas.speciesIndex("C2H5OH")] = YFUEL;
+    YR[gas.speciesIndex("O2")] = YO2Air;
+    YR[gas.speciesIndex("N2")] = YN2Air;
+    YR[gas.speciesIndex("AR")] = YARAir;
+
     for (int j=0; j<nx; j++) {
         x(j) = XBEG + dx*j;
         u(j) = -a*(x(j) - 0.5*(XEND-XBEG));
@@ -86,6 +95,7 @@ int main()
         cout << "Time =  " << TBEG+i*dt << setprecision(4) << endl;
  
         // V equation
+        // TODO: conservative form
         A.setZero();
         b.setZero();
         for (int j=1; j<nx-1; j++) {
@@ -103,28 +113,29 @@ int main()
         b(nx-1) = VR;
         V = tdma(A,b);
         VectorXd::Index loc;
-        cout << "V.max   " << V.maxCoeff(&loc) << " @ position "
+        cout << setw(WIDTH) << "V.max "
+             << setw(WIDTH/2) << V.maxCoeff(&loc) << " @ position "
              << loc << endl;
 
         // Continuity equation
         // TODO: try different V-BC (not zero)
         // Using staggered grid
-        MatrixXd Ac(nx-1,nx-1);
-        MatrixXd bc(nx-1,1);
-        Ac.setZero();
-        bc.setZero();
-        for (int j=1; j<nx-1; j++) {
-            Ac(j,j-1) = -1.0;
-            Ac(j,j) = 1.0;
-            bc(j) = -dx*V(j);
-        }
-        Ac(0,0) = 1.0;
-        bc(0) = uL - 0.5*dx*VL;
-        VectorXd uStag = tdma(Ac,bc); // staggered grid of size nx-1
-        for (int j=1; j<nx-1; j++) {
-            u(j) = 0.5*(uStag(j-1)+uStag(j));
-        }
-        u(0) = uL; u(nx-1) = uR;
+        // MatrixXd Ac(nx-1,nx-1);
+        // MatrixXd bc(nx-1,1);
+        // Ac.setZero();
+        // bc.setZero();
+        // for (int j=1; j<nx-1; j++) {
+        //     Ac(j,j-1) = -1.0;
+        //     Ac(j,j) = 1.0;
+        //     bc(j) = -dx*V(j);
+        // }
+        // Ac(0,0) = 1.0;
+        // bc(0) = uL - 0.5*dx*VL;
+        // VectorXd uStag = tdma(Ac,bc); // staggered grid of size nx-1
+        // for (int j=1; j<nx-1; j++) {
+        //     u(j) = 0.5*(uStag(j-1)+uStag(j));
+        // }
+        // u(0) = uL; u(nx-1) = uR;
 
         // Upwind differencing
         // for (int j=1; j<nx-1; j++) {
@@ -154,28 +165,32 @@ int main()
         // b(nx-1) = uR;
         // u = tdma(A,b);
 
-        cout << "u.max   " << u.maxCoeff(&loc) << " @ position "
+        cout << setw(WIDTH) << "u.max "
+             << setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "
              << loc << endl;
 
-        // Y equation
-        A.setZero();
-        b.setZero();
-        for (int j=1; j<nx-1; j++) {
-            double a1 = -D(j)*dt/(dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
-            double a2 = 1.0 + 2.0*D(j)*dt/(dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-            double a3 = -D(j)*dt/(dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-            A(j,j-1) = a1;
-            A(j,j) = a2;
-            A(j,j+1) = a3;
-            b(j) = Y[0](j);
+        // Y equations
+        for (int k=0; k<nsp; k++) {
+            A.setZero();
+            b.setZero();
+            for (int j=1; j<nx-1; j++) {
+                double a1 = -D(j)*dt/(dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
+                double a2 = 1.0 + 2.0*D(j)*dt/(dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
+                double a3 = -D(j)*dt/(dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
+                A(j,j-1) = a1;
+                A(j,j) = a2;
+                A(j,j+1) = a3;
+                b(j) = Y[k](j);
+            }
+            A(0,0) = 1.0;
+            A(nx-1,nx-1) = 1.0;
+            b(0) = YL[k];
+            b(nx-1) = YR[k];
+            Y[k] = tdma(A,b);
+            cout << setw(WIDTH) << "Y-" + gas.speciesName(k) + ".max "
+                 << setw(WIDTH/2) << Y[k].maxCoeff(&loc) << " @ position "
+                 << loc << endl;
         }
-        A(0,0) = 1.0;
-        A(nx-1,nx-1) = 1.0;
-        b(0) = YL;
-        b(nx-1) = YR;
-        Y[0] = tdma(A,b);
-        cout << "Y.max   " << Y[0].maxCoeff(&loc) << " @ position "
-             << loc << endl;
 
         // T eqaution
         A.setZero();
@@ -194,11 +209,11 @@ int main()
         b(0) = TL;
         b(nx-1) = TR;
         T = tdma(A,b);
-        cout << "T.max   " << T.maxCoeff(&loc) << " @ position "
+        cout << setw(WIDTH) << "T.max "
+             << setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
              << loc << endl;
 
         gas.updateThermo(T, Y, Le, rho, mu, kappa, alpha, D);
-
 
         cout << endl;
     }
@@ -209,13 +224,20 @@ int main()
 
 
     // Output
-    fout << "x (m),u (m/s), V (1/s), T (K), Y" << endl;
+    fout << "x (m),u (m/s),V (1/s),T (K)";
+    for (int k=0; k<nsp; k++) {
+        fout << "," << gas.speciesName(k);
+    }
+    fout << endl;
     for (int j=0; j<nx; j++) {
-        fout << x(j) << setprecision(6) << ","
-             << u(j) << setprecision(6) << ","
-             << V(j) << setprecision(6) << ","
-             << T(j) << setprecision(6) << ","
-             << Y[0][j] << setprecision (6) << endl;
+        fout << setprecision(6) << x(j) << ","
+             << setprecision(6) << u(j) << ","
+             << setprecision(6) << V(j) << ","
+             << setprecision(6) << T(j);
+        for (int k=0; k<nsp; k++) {
+            fout << "," << setprecision(6) << Y[k](j);
+        }
+        fout << endl;
     }
 
     return 0;

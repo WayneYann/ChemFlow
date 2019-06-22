@@ -26,6 +26,8 @@ public:
 
     int speciesIndex(const std::string& name) const;
 
+    std::string speciesName(const int& k) const;
+
     double sutherland(const double& T) const;
 
     void updateThermo(const Eigen::VectorXd& T,
