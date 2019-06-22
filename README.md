@@ -1,2 +1,2 @@
 # ChemFlow
-Unsteady quasi-1D strained flame
+Segregated solution to quasi-1D transient flow with chemical reactions

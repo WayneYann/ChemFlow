@@ -1,6 +1,3 @@
-// Sat Jun 22 16:39:14 CST 2019
-// Chemically Reacting Flow
-
 #include <iostream>
 #include <fstream>
 #include <iomanip>
