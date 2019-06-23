@@ -20,13 +20,13 @@ int main()
     const double XEND = 0.02;
     const double dx = (XEND - XBEG) / (nx - 1);
     VectorXd x(nx);
-    const int nt = 201;
+    const int nt = 401;
     const double TBEG = 0.0;
-    const double TEND = 0.1;
+    const double TEND = 0.2;
     const double dt = (TEND - TBEG) / (nt - 1);
 
     // BC
-    const double a = 50.0;  // strain rate
+    const double a = 50.0;  // initial strain rate
     const double uL = 0.5*a*(XEND - XBEG);
     const double uR = -0.5*a*(XEND - XBEG);
     const double VL = a;
@@ -47,11 +47,13 @@ int main()
     const size_t WIDTH = 18;
 
     // Solution and initial conditions
+    const double rhoInf = 1.173;
     const double p0 = 101325.0;
     ChemThermo gas("Ethanol_31.cti", p0);
     const int nsp = gas.nsp();  // number of species
     VectorXd u(nx);  // x-direction velocity [m/s]
     VectorXd V(nx);  // v/y = dv/dy [1/s]
+    double lambda = rhoInf*a*a;  // -1/y*dp/dy [Pa/m2]
     VectorXd T(nx);  // temperature [K]
     vector<VectorXd> Y(nsp);  // species mass fractions [-]
     YL.resize(nsp, 0.0);
@@ -76,14 +78,15 @@ int main()
     }
 
     // Properties
-    const double rhoInf = 1.173;
     const double Le = 1.0;
     VectorXd rho(nx);
+    VectorXd rhoPrev(nx);
     VectorXd mu(nx);
     VectorXd kappa(nx);
     VectorXd alpha(nx);
     VectorXd D(nx);
     gas.updateThermo(T, Y, Le, rho, mu, kappa, alpha, D);
+    rhoPrev = rho;
 
 
     // Time marching
@@ -91,79 +94,58 @@ int main()
     startTime = clock();
     MatrixXd A(nx,nx);
     MatrixXd b(nx,1);
+    VectorXd m(nx);  // conservative quantity
     for (int i=0; i<nt; i++) {
         cout << "Time =  " << TBEG+i*dt << setprecision(4) << endl;
  
         // V equation
-        // TODO: conservative form
         A.setZero();
         b.setZero();
+        m.setZero();
         for (int j=1; j<nx-1; j++) {
-            double a1 = -mu(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
-            double a2 = 1.0 + dt*V(j) + 2.0*mu(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-            double a3 = -mu(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-            A(j,j-1) = a1;
-            A(j,j) = a2;
-            A(j,j+1) = a3;
-            b(j) = rhoInf*a*a*dt/rho(j) + V(j);
+            A(j,j-1) = -mu(j)*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
+            A(j,j) = 1.0 + 2.0*dt*V(j) + 2.0*mu(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
+            A(j,j+1) = -mu(j)*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
+            b(j) = lambda*dt + rho(j)*V(j);
         }
         A(0,0) = 1.0;
         A(nx-1,nx-1) = 1.0;
-        b(0) = VL;
-        b(nx-1) = VR;
-        V = tdma(A,b);
+        b(0) = rho(0)*VL;
+        b(nx-1) = rho(nx-1)*VR;
+        m = tdma(A,b);
+        V = m.cwiseQuotient(rho);
         VectorXd::Index loc;
         cout << setw(WIDTH) << "V.max "
              << setw(WIDTH/2) << V.maxCoeff(&loc) << " @ position "
              << loc << endl;
 
         // Continuity equation
-        // TODO: try different V-BC (not zero)
-        // Using staggered grid
-        // MatrixXd Ac(nx-1,nx-1);
-        // MatrixXd bc(nx-1,1);
-        // Ac.setZero();
-        // bc.setZero();
-        // for (int j=1; j<nx-1; j++) {
-        //     Ac(j,j-1) = -1.0;
-        //     Ac(j,j) = 1.0;
-        //     bc(j) = -dx*V(j);
+        // Propagate from left to right
+        // m.setZero();
+        // m(0) = rho(0) * uL;
+        // for (int j=1; j<nx; j++) {
+        //     double drhodt0 = (rho(j-1) - rhoPrev(j-1))/dt;
+        //     double drhodt1 = (rho(j) - rhoPrev(j))/dt;
+        //     m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) - 0.5*(rho(j-1)*V(j-1)+rho(j)*V(j)));
         // }
-        // Ac(0,0) = 1.0;
-        // bc(0) = uL - 0.5*dx*VL;
-        // VectorXd uStag = tdma(Ac,bc); // staggered grid of size nx-1
-        // for (int j=1; j<nx-1; j++) {
-        //     u(j) = 0.5*(uStag(j-1)+uStag(j));
-        // }
-        // u(0) = uL; u(nx-1) = uR;
-
+        // u = m.cwiseQuotient(rho);
+        // double Flambda = u(nx-1) - uR;
         // Upwind differencing
+        // A.setZero();
+        // b.setZero();
+        // m.setZero();
         // for (int j=1; j<nx-1; j++) {
         //     A(j,j-1) = (u(j) > 0.0 ? -1.0 : 0.0);
         //     A(j,j) = (u(j) > 0.0 ? 1.0 : -1.0);
         //     A(j,j+1) = (u(j) > 0.0 ? 0.0 : 1.0);
-        //     b(j) = -dx*V(j);
+        //     b(j) = -dx*rho(j)*V(j) - dx*(rho(j) - rhoPrev(j))/dt;
         // }
         // A(0,0) = 1;
         // A(nx-1,nx-1) = 1;
-        // b(0) = uL;
-        // b(nx-1) = uR;
-        // u = tdma(A,b);
-        //
-        // Central differencing
-        // FAIL
-        // A.setZero();
-        // b.setZero();
-        // for (int j=1; j<nx-1; j++) {
-        //     A(j,j-1) = -1.0;
-        //     A(j,j+1) = 1.0;
-        //     b(j) = -2*dx*V(j);
-        // }
-        // A(0,0) = 1.0;
-        // A(nx-1,nx-1) = 1.0;
-        // b(0) = uL;
-        // b(nx-1) = uR;
-        // u = tdma(A,b);
+        // b(0) = rho(0)*uL;
+        // b(nx-1) = rho(nx-1)*uR;
+        // m = tdma(A,b);
+        // u = m.cwiseQuotient(rho);
 
         cout << setw(WIDTH) << "u.max "
              << setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "
@@ -173,47 +155,45 @@ int main()
         for (int k=0; k<nsp; k++) {
             A.setZero();
             b.setZero();
+            m.setZero();
             for (int j=1; j<nx-1; j++) {
-                double a1 = -D(j)*dt/(dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
-                double a2 = 1.0 + 2.0*D(j)*dt/(dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-                double a3 = -D(j)*dt/(dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-                A(j,j-1) = a1;
-                A(j,j) = a2;
-                A(j,j+1) = a3;
-                b(j) = Y[k](j);
+                A(j,j-1) = -rho(j)*D(j)*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
+                A(j,j) = 1.0 + dt*V(j) + 2.0*rho(j)*D(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
+                A(j,j+1) = -rho(j)*D(j)*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
+                b(j) = rho(j)*Y[k](j);
             }
             A(0,0) = 1.0;
             A(nx-1,nx-1) = 1.0;
-            b(0) = YL[k];
-            b(nx-1) = YR[k];
-            Y[k] = tdma(A,b);
+            b(0) = rho(0)*YL[k];
+            b(nx-1) = rho(nx-1)*YR[k];
+            m = tdma(A,b);
+            Y[k] = m.cwiseQuotient(rho);
             cout << setw(WIDTH) << "Y-" + gas.speciesName(k) + ".max "
                  << setw(WIDTH/2) << Y[k].maxCoeff(&loc) << " @ position "
                  << loc << endl;
         }
 
-        // T eqaution
-        A.setZero();
-        b.setZero();
-        for (int j=1; j<nx-1; j++) {
-            double a1 = -alpha(j)*dt/(dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
-            double a2 = 1.0 + 2.0*alpha(j)*dt/(dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-            double a3 = -alpha(j)*dt/(dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-            A(j,j-1) = a1;
-            A(j,j) = a2;
-            A(j,j+1) = a3;
-            b(j) = T(j);
-        }
-        A(0,0) = 1.0;
-        A(nx-1,nx-1) = 1.0;
-        b(0) = TL;
-        b(nx-1) = TR;
-        T = tdma(A,b);
-        cout << setw(WIDTH) << "T.max "
-             << setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
-             << loc << endl;
+        // Energy eqaution
+        // A.setZero();
+        // b.setZero();
+        // m.setZero();
+        // for (int j=1; j<nx-1; j++) {
+        //     A(j,j-1) = -rho(j)*alpha(j)*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
+        //     A(j,j) = 1.0 + dt*V(j) + 2.0*rho(j)*alpha(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
+        //     A(j,j+1) = -rho(j)*alpha(j)*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
+        //     b(j) = T(j);
+        // }
+        // A(0,0) = 1.0;
+        // A(nx-1,nx-1) = 1.0;
+        // b(0) = TL;
+        // b(nx-1) = TR;
+        // T = tdma(A,b);
+        // cout << setw(WIDTH) << "T.max "
+        //      << setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
+        //      << loc << endl;
 
-        gas.updateThermo(T, Y, Le, rho, mu, kappa, alpha, D);
+        // rhoPrev = rho;
+        // gas.updateThermo(T, Y, Le, rho, mu, kappa, alpha, D);
 
         cout << endl;
     }

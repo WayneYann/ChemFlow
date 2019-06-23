@@ -26,10 +26,10 @@ double ChemThermo::sutherland(const double& T) const
 }
 
 void ChemThermo::updateThermo(const Eigen::VectorXd& T,
-                             const std::vector<Eigen::VectorXd>& Y,
-                             const double Le, Eigen::VectorXd& rho,
-                             Eigen::VectorXd& mu, Eigen::VectorXd& kappa,
-                             Eigen::VectorXd& alpha, Eigen::VectorXd& D)
+                              const std::vector<Eigen::VectorXd>& Y,
+                              const double Le, Eigen::VectorXd& rho,
+                              Eigen::VectorXd& mu, Eigen::VectorXd& kappa,
+                              Eigen::VectorXd& alpha, Eigen::VectorXd& D)
 {
     for (int j=0; j<T.size(); j++) {
         double y[nsp_];
@@ -49,7 +49,7 @@ void ChemThermo::updateThermo(const Eigen::VectorXd& T,
 }
 
 void ChemThermo::massFractions(const std::vector<Eigen::VectorXd>& Y,
-                              double* y, const int& j) const
+                               double* y, const int& j) const
 {
     for (int k=0; k<nsp_; k++) {
         y[k] = Y[k](j);
