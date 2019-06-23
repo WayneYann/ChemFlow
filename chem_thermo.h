@@ -33,6 +33,9 @@ public:
 
     double calcHs(const double& T, const double* y);
 
+    void calcT(Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y,
+               const Eigen::VectorXd& hs);
+
     double sutherland(const double& T) const;
 
     void updateThermo(const Eigen::VectorXd& T,

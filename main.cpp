@@ -32,7 +32,7 @@ int main()
     const double VL = a;
     const double VR = a;
     const double TI = 300;
-    const double TL = 300;
+    const double TL = 400;
     const double TR = 300;
     const double YO2Air = 0.23197;
     const double YN2Air = 0.75425;
@@ -196,7 +196,7 @@ int main()
         b(nx-1) = rho(nx-1)*hsR;
         m = tdma(A,b);
         hs = m.cwiseQuotient(rho);
-        // TODO: CalcT using hs
+        gas.calcT(T, Y, hs);
 
         cout << setw(WIDTH) << "T.max "
              << setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "

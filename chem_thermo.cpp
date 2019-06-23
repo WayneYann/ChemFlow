@@ -1,4 +1,5 @@
 #include <cmath>
+#include <stdexcept>
 #include "chem_thermo.h"
 
 ChemThermo::ChemThermo(const std::string& inputFile, const double& p0)
@@ -20,12 +21,48 @@ std::string ChemThermo::speciesName(const int& k) const
 
 double ChemThermo::calcHs(const double& T, const double* y)
 {
+    // This order also serves the purpose of setting gas_ state(T, y)
+    gas_.setState_TPY(Tstd, p0_, y);
+    const double h0 = gas_.enthalpy_mass();
     gas_.setState_TPY(T, p0_, y);
     const double ha = gas_.enthalpy_mass();
-    gas_.setState_TPY(Tstd, p0_, y);
 
-    return ha - gas_.enthalpy_mass();
+    return ha - h0;
 }
+
+void ChemThermo::calcT(Eigen::VectorXd& T,
+                       const std::vector<Eigen::VectorXd>& Y,
+                       const Eigen::VectorXd& hs)
+{
+    for (int j=0; j<T.size(); j++) {
+        double y[nsp_];
+        massFractions(Y, y, j);
+
+        // Newton iterative method
+        double Test = T(j);
+        double Tnew = T(j);
+        double TnewS = T(j);  // damped value
+        double Ttol = T(j)*1e-04;
+        double fx, alpha;
+        int iter = 0;
+        do
+        {
+            Test = TnewS;
+            fx = calcHs(Test, y) - hs(j);
+            Tnew = Test - fx / gas_.cp_mass();
+            alpha = 1.0;
+            TnewS = Tnew;
+            while (std::abs(fx) < std::abs(calcHs(TnewS, y) - hs(j))) {
+                alpha /= 2.0;
+                TnewS = alpha*Tnew + (1.0-alpha)*Test;
+            }
+            ++iter;
+        } while ((std::abs(Tnew - Test) > Ttol) && (iter < 100));
+        if (iter >= 100) throw std::runtime_error("Maximum iterations reached");
+        T(j) = Tnew;
+    }
+}
+
 
 double ChemThermo::sutherland(const double& T) const
 {

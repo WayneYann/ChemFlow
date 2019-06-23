@@ -47,12 +47,8 @@ TLabel = name[3]
 YLabel = name[4]
 
 fig1 = plt.figure(figsize=figs)
-fig2 = plt.figure(figsize=figs)
-fig3 = plt.figure(figsize=figs)
 ax1 = fig1.add_subplot(211)
 ax2 = fig1.add_subplot(212)
-ax3 = fig2.add_subplot(111)
-ax4 = fig3.add_subplot(111)
 for i,file in enumerate(filename):
     data = np.loadtxt(file,delimiter=',',comments='#',skiprows=1)
     data = np.transpose(data)
@@ -63,8 +59,6 @@ for i,file in enumerate(filename):
     Y = data[4]
     ax1.plot(x,u,label='u',color=cs[i],ls='-',lw=linew)
     ax2.plot(x,V,label='V',color=cs[i],ls='-',lw=linew)
-    ax3.plot(x,T,label='T',color=cs[i],ls='-',lw=linew)
-    ax4.plot(x,Y,label='Y',color=cs[i],ls='-',lw=linew)
     # ax1.plot(x,y,label=file,ls=lstyl[i],lw=linew,color=cs[i])
 
 
@@ -82,14 +76,5 @@ ax2.tick_params(labelsize=fonts1)
 ax2.set_xlabel(rf'{xLabel}',fontsize=fonts1,color='k')
 ax2.set_ylabel(rf'{VLabel}',fontsize=fonts1,color='k')
 
-ax3.set_xticks(x_ticks)
-ax3.tick_params(labelsize=fonts1)
-ax3.set_xlabel(rf'{xLabel}',fontsize=fonts1,color='k')
-ax3.set_ylabel(rf'{TLabel}',fontsize=fonts1,color='k')
-
-ax4.set_xticks(x_ticks)
-ax4.tick_params(labelsize=fonts1)
-ax4.set_xlabel(rf'{xLabel}',fontsize=fonts1,color='k')
-ax4.set_ylabel(rf'{YLabel}',fontsize=fonts1,color='k')
-#plt.savefig(figname+'.png',dpi=500,bbox_inches='tight')
+plt.savefig(figname+'.png',dpi=500,bbox_inches='tight')
 plt.show()
