@@ -55,6 +55,7 @@ int main()
     VectorXd V(nx);  // v/y = dv/dy [1/s]
     double lambda = rhoInf*a*a;  // -1/y*dp/dy [Pa/m2]
     VectorXd T(nx);  // temperature [K]
+    VectorXd hs(nx);  // sensible enthalpy [J/kg]
     vector<VectorXd> Y(nsp);  // species mass fractions [-]
     YL.resize(nsp, 0.0);
     YR.resize(nsp, 0.0);
@@ -62,6 +63,8 @@ int main()
     YR[gas.speciesIndex("O2")] = YO2Air;
     YR[gas.speciesIndex("N2")] = YN2Air;
     YR[gas.speciesIndex("AR")] = YARAir;
+    const double hsL = gas.calcHs(TL, YL.data());
+    const double hsR = gas.calcHs(TR, YR.data());
 
     for (int j=0; j<nx; j++) {
         x(j) = XBEG + dx*j;
@@ -75,6 +78,9 @@ int main()
         Y[gas.speciesIndex("O2")](j) = YO2Air;
         Y[gas.speciesIndex("N2")](j) = YN2Air;
         Y[gas.speciesIndex("AR")](j) = YARAir;
+        double y[nsp];
+        gas.massFractions(Y, y, j);
+        hs(j) = gas.calcHs(T(j), y);
     }
 
     // Properties
@@ -174,6 +180,7 @@ int main()
         }
 
         // Energy eqaution
+        // Solve for sensible enthalpy
         // A.setZero();
         // b.setZero();
         // m.setZero();
@@ -181,16 +188,16 @@ int main()
         //     A(j,j-1) = -rho(j)*alpha(j)*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
         //     A(j,j) = 1.0 + dt*V(j) + 2.0*rho(j)*alpha(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
         //     A(j,j+1) = -rho(j)*alpha(j)*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
-        //     b(j) = T(j);
+        //     b(j) = rho(j)*hs(j);
         // }
         // A(0,0) = 1.0;
         // A(nx-1,nx-1) = 1.0;
-        // b(0) = TL;
-        // b(nx-1) = TR;
-        // T = tdma(A,b);
-        // cout << setw(WIDTH) << "T.max "
-        //      << setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
-        //      << loc << endl;
+        // b(0) = ;
+        // b(nx-1) = ;
+
+        cout << setw(WIDTH) << "T.max "
+             << setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
+             << loc << endl;
 
         // rhoPrev = rho;
         // gas.updateThermo(T, Y, Le, rho, mu, kappa, alpha, D);

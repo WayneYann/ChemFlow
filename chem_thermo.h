@@ -9,6 +9,7 @@
 #include "cantera/thermo/IdealGasPhase.h"
 
 const double R = 8314.47;  // [J/kmol K]
+const double Tstd = 298.15;  // [K]
 
 // Wrapper class of Cantera IdealGasMix with Sutherland transport
 class ChemThermo
@@ -28,6 +29,10 @@ public:
 
     std::string speciesName(const int& k) const;
 
+    void massFractions(const std::vector<Eigen::VectorXd>& Y, double* y, const int& j) const;
+
+    double calcHs(const double& T, const double* y);
+
     double sutherland(const double& T) const;
 
     void updateThermo(const Eigen::VectorXd& T,
@@ -38,8 +43,6 @@ public:
 
 
 private:
-    void massFractions(const std::vector<Eigen::VectorXd>& Y, double* y, const int& j) const;
-
     Cantera::IdealGasMix gas_;
 
     int nsp_;

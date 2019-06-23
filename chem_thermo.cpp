@@ -18,6 +18,15 @@ std::string ChemThermo::speciesName(const int& k) const
     return gas_.speciesName(k);
 }
 
+double ChemThermo::calcHs(const double& T, const double* y)
+{
+    gas_.setState_TPY(T, p0_, y);
+    const double ha = gas_.enthalpy_mass();
+    gas_.setState_TPY(Tstd, p0_, y);
+
+    return ha - gas_.enthalpy_mass();
+}
+
 double ChemThermo::sutherland(const double& T) const
 {
     const double As = 1.67212e-6;
