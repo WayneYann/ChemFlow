@@ -127,16 +127,17 @@ int main()
 
         // Continuity equation
         // Propagate from left to right
-        // m.setZero();
-        // m(0) = rho(0) * uL;
-        // for (int j=1; j<nx; j++) {
-        //     double drhodt0 = (rho(j-1) - rhoPrev(j-1))/dt;
-        //     double drhodt1 = (rho(j) - rhoPrev(j))/dt;
-        //     m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) - 0.5*(rho(j-1)*V(j-1)+rho(j)*V(j)));
-        // }
-        // u = m.cwiseQuotient(rho);
-        // double Flambda = u(nx-1) - uR;
+        m.setZero();
+        m(0) = rho(0) * uL;
+        for (int j=1; j<nx; j++) {
+            double drhodt0 = (rho(j-1) - rhoPrev(j-1))/dt;
+            double drhodt1 = (rho(j) - rhoPrev(j))/dt;
+            m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) - 0.5*(rho(j-1)*V(j-1)+rho(j)*V(j)));
+        }
+        u = m.cwiseQuotient(rho);
+        double Flambda = u(nx-1) - uR;
         // Upwind differencing
+        // FAIL
         // A.setZero();
         // b.setZero();
         // m.setZero();
@@ -180,27 +181,29 @@ int main()
         }
 
         // Energy eqaution
-        // Solve for sensible enthalpy
-        // A.setZero();
-        // b.setZero();
-        // m.setZero();
-        // for (int j=1; j<nx-1; j++) {
-        //     A(j,j-1) = -rho(j)*alpha(j)*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
-        //     A(j,j) = 1.0 + dt*V(j) + 2.0*rho(j)*alpha(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-        //     A(j,j+1) = -rho(j)*alpha(j)*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
-        //     b(j) = rho(j)*hs(j);
-        // }
-        // A(0,0) = 1.0;
-        // A(nx-1,nx-1) = 1.0;
-        // b(0) = ;
-        // b(nx-1) = ;
+        A.setZero();
+        b.setZero();
+        m.setZero();
+        for (int j=1; j<nx-1; j++) {
+            A(j,j-1) = -rho(j)*alpha(j)*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
+            A(j,j) = 1.0 + dt*V(j) + 2.0*rho(j)*alpha(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
+            A(j,j+1) = -rho(j)*alpha(j)*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
+            b(j) = rho(j)*hs(j);
+        }
+        A(0,0) = 1.0;
+        A(nx-1,nx-1) = 1.0;
+        b(0) = rho(0)*hsL;
+        b(nx-1) = rho(nx-1)*hsR;
+        m = tdma(A,b);
+        hs = m.cwiseQuotient(rho);
+        // TODO: CalcT using hs
 
         cout << setw(WIDTH) << "T.max "
              << setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
              << loc << endl;
 
-        // rhoPrev = rho;
-        // gas.updateThermo(T, Y, Le, rho, mu, kappa, alpha, D);
+        rhoPrev = rho;
+        gas.updateThermo(T, Y, Le, rho, mu, kappa, alpha, D);
 
         cout << endl;
     }
