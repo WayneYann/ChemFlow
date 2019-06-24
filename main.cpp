@@ -27,12 +27,10 @@ int main()
 
     // BC
     const double a = 50.0;  // initial strain rate
-    const double uL = 0.5*a*(XEND - XBEG);
-    const double uR = -0.5*a*(XEND - XBEG);
-    const double VL = a;
-    const double VR = a;
+    const double VL = a*0;
+    const double VR = a*0;
     const double TI = 300;
-    const double TL = 400;
+    const double TL = 1000;
     const double TR = 300;
     const double YO2Air = 0.23197;
     const double YN2Air = 0.75425;
@@ -128,14 +126,15 @@ int main()
         // Continuity equation
         // Propagate from left to right
         m.setZero();
-        m(0) = rho(0) * uL;
+        m(0) = rho(0) * u(0);
         for (int j=1; j<nx; j++) {
             double drhodt0 = (rho(j-1) - rhoPrev(j-1))/dt;
             double drhodt1 = (rho(j) - rhoPrev(j))/dt;
             m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) - 0.5*(rho(j-1)*V(j-1)+rho(j)*V(j)));
         }
+        const double rhouOffset = (-rho(0)*m(nx-1) - rho(nx-1)*m(0)) / (rho(0) + rho(nx-1));
+        m = m.array() + rhouOffset;
         u = m.cwiseQuotient(rho);
-        double Flambda = u(nx-1) - uR;
         // Upwind differencing
         // FAIL
         // A.setZero();
