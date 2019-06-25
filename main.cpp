@@ -7,7 +7,8 @@
 #include <Eigen/Dense>
 
 #include "tdma.h"
-#include "chem_thermo.h"
+#include "ChemThermo.h"
+#include "Combustion.h"
 
 using namespace std;
 using namespace Eigen;
@@ -30,7 +31,7 @@ int main()
     const double VL = a*0;
     const double VR = a*0;
     const double TI = 300;
-    const double TL = 1000;
+    const double TL = 300;
     const double TR = 300;
     const double YO2Air = 0.23197;
     const double YN2Air = 0.75425;
@@ -48,10 +49,11 @@ int main()
     const double rhoInf = 1.173;
     const double p0 = 101325.0;
     ChemThermo gas("Ethanol_31.cti", p0);
+    Combustion combustion(gas);
     const int nsp = gas.nsp();  // number of species
     VectorXd u(nx);  // x-direction velocity [m/s]
     VectorXd V(nx);  // v/y = dv/dy [1/s]
-    double lambda = rhoInf*a*a;  // -1/y*dp/dy [Pa/m2]
+    const double lambda = rhoInf*a*a;  // -1/y*dp/dy [Pa/m2]
     VectorXd T(nx);  // temperature [K]
     VectorXd hs(nx);  // sensible enthalpy [J/kg]
     vector<VectorXd> Y(nsp);  // species mass fractions [-]
@@ -135,23 +137,6 @@ int main()
         const double rhouOffset = (-rho(0)*m(nx-1) - rho(nx-1)*m(0)) / (rho(0) + rho(nx-1));
         m = m.array() + rhouOffset;
         u = m.cwiseQuotient(rho);
-        // Upwind differencing
-        // FAIL
-        // A.setZero();
-        // b.setZero();
-        // m.setZero();
-        // for (int j=1; j<nx-1; j++) {
-        //     A(j,j-1) = (u(j) > 0.0 ? -1.0 : 0.0);
-        //     A(j,j) = (u(j) > 0.0 ? 1.0 : -1.0);
-        //     A(j,j+1) = (u(j) > 0.0 ? 0.0 : 1.0);
-        //     b(j) = -dx*rho(j)*V(j) - dx*(rho(j) - rhoPrev(j))/dt;
-        // }
-        // A(0,0) = 1;
-        // A(nx-1,nx-1) = 1;
-        // b(0) = rho(0)*uL;
-        // b(nx-1) = rho(nx-1)*uR;
-        // m = tdma(A,b);
-        // u = m.cwiseQuotient(rho);
 
         cout << setw(WIDTH) << "u.max "
              << setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "

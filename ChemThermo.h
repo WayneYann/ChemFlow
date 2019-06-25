@@ -1,5 +1,5 @@
-#ifndef CTF_ChemThermo_H_
-#define CTF_ChemThermo_H_
+#ifndef CTF_CHEMTHERMO_H_
+#define CTF_CHEMTHERMO_H_
 
 #include <string>
 #include <vector>
@@ -11,19 +11,21 @@
 const double R = 8314.47;  // [J/kmol K]
 const double Tstd = 298.15;  // [K]
 
-// Wrapper class of Cantera IdealGasMix with Sutherland transport
+// Wrapper class for Cantera IdealGasMix with Sutherland transport
 class ChemThermo
 {
 public:
     ChemThermo(const std::string& inputFile, const double& p0);
     ChemThermo() = default;
 
-    ChemThermo(const ChemThermo&) = delete;
     ChemThermo& operator=(const ChemThermo&) = delete;
 
     int nsp() const {
         return nsp_;
     }
+
+    // Molecular weight [kg/kmol]
+    double W(const int& k) const;
 
     int speciesIndex(const std::string& name) const;
 
@@ -53,4 +55,4 @@ private:
     double p0_;
 
 };
-#endif  // CTF_ChemThermo_H_
+#endif  // CTF_CHEMTHERMO_H_

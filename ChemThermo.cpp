@@ -1,12 +1,17 @@
 #include <cmath>
 #include <stdexcept>
-#include "chem_thermo.h"
+#include "ChemThermo.h"
 
 ChemThermo::ChemThermo(const std::string& inputFile, const double& p0)
     : gas_(inputFile,"gas"),
       p0_(p0)
 {
     nsp_ = gas_.nSpecies();
+}
+
+double ChemThermo::W(const int& k) const
+{
+    return gas_.molecularWeight(k);
 }
 
 int ChemThermo::speciesIndex(const std::string& name) const
