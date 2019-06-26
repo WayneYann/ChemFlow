@@ -1,10 +1,9 @@
-#include <fstream>
 #include "Combustion.h"
 
 Combustion::Combustion(const ChemThermo& chemThermo)
-    : thermo_(chemThermo.gas()),
+    : chemThermo_(chemThermo),
+      thermo_(chemThermo.gas()),
       nsp_(chemThermo.nsp()),
-      reactionRate_(chemThermo.nsp()),
       maxSteps_(100),
       react_(),
       ode_()
@@ -15,12 +14,10 @@ Combustion::Combustion(const ChemThermo& chemThermo)
 
 void Combustion::solve(const double& deltaT, const Eigen::VectorXd& T,
                        const std::vector<Eigen::VectorXd>& Y,
-                       const double& p0)
+                       const double& p0, std::vector<Eigen::VectorXd>& wdot,
+                       Eigen::VectorXd& qdot)
 {
-    for (int k=0; k<nsp_; k++) {
-        reactionRate_[k].resize(T.size());
-    }
-
+    qdot.setZero();
     for (int j=0; j<T.size(); j++) {
         double y[nsp_+2], y0[nsp_+2];
         y[0] = 1.0;
@@ -35,13 +32,10 @@ void Combustion::solve(const double& deltaT, const Eigen::VectorXd& T,
         this->solve(y, p0, deltaT);
 
         for (int k=0; k<nsp_; k++) {
-            reactionRate_[k](j) = (y[k+2] - y0[k+2])/deltaT;
+            wdot[k](j) = (y[k+2] - y0[k+2])/deltaT;
+            qdot(j) -= wdot[k](j)*chemThermo_.Hc(k);
         }
     }
-    Eigen::VectorXd::Index loc;
-    std::cout << "Max omega of " << thermo_.speciesName(11) << "   "
-              << reactionRate_[11].maxCoeff(&loc) << " @ position "
-              << loc << std::endl;
 }
 
 void Combustion::solve(double* y, const double& p, const double& xEnd)

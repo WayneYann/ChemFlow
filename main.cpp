@@ -27,12 +27,12 @@ int main()
     const double dt = (TEND - TBEG) / (nt - 1);
 
     // BC
-    const double a = 50.0;  // initial strain rate
+    const double a = 50.0;  // prescribed strain rate
     const double VL = a*0;
     const double VR = a*0;
-    const double TI = 1200;
-    const double TL = 1200;
-    const double TR = 1200;
+    const double TI = 300;
+    const double TL = 300;
+    const double TR = 300;
     const double YO2Air = 0.23197;
     const double YN2Air = 0.75425;
     const double YARAir = 0.01378;
@@ -43,21 +43,25 @@ int main()
 
     // Output
     ofstream fout("output.csv");
-    ofstream omegaOut("omegaOut.csv");
+    ofstream rout("reactionOut.csv");
     const size_t WIDTH = 18;
 
     // Solution and initial conditions
+    // Both std::vector and Eigen::VectorXd are used for the purpose of
+    // distinguishing between containers for species and spatial grid points
     const double rhoInf = 1.173;
+    const double lambda = rhoInf*a*a;  // -1/y*dp/dy [Pa/m2]
     const double p0 = 101325.0;
     ChemThermo gas("Ethanol_31.cti", p0);
     Combustion combustion(gas);
     const int nsp = gas.nsp();  // number of species
     VectorXd u(nx);  // x-direction velocity [m/s]
     VectorXd V(nx);  // v/y = dv/dy [1/s]
-    const double lambda = rhoInf*a*a;  // -1/y*dp/dy [Pa/m2]
     VectorXd T(nx);  // temperature [K]
     VectorXd hs(nx);  // sensible enthalpy [J/kg]
     vector<VectorXd> Y(nsp);  // species mass fractions [-]
+    vector<VectorXd> wdot(nsp);  // reaction rates [kg/m3 s]
+    VectorXd qdot(nx);  // heat source [J/m3 s]
     YL.resize(nsp, 0.0);
     YR.resize(nsp, 0.0);
     YL[gas.speciesIndex("C2H5OH")] = YFUEL;
@@ -74,7 +78,9 @@ int main()
         T(j) = TI;
         for (int k=0; k<nsp; k++) {
             Y[k].resize(nx);
+            wdot[k].resize(nx);
             Y[k](j) = 0.0;
+            wdot[k](j) = 0.0;
         }
         Y[gas.speciesIndex("O2")](j) = YO2Air;
         Y[gas.speciesIndex("N2")](j) = YN2Air;
@@ -82,6 +88,7 @@ int main()
         double y[nsp];
         gas.massFractions(Y, y, j);
         hs(j) = gas.calcHs(T(j), y);
+        qdot(j) = 0.0;
     }
 
     // Properties
@@ -142,7 +149,7 @@ int main()
              << setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "
              << loc << endl;
 
-        combustion.solve(dt, T, Y, p0);
+        combustion.solve(dt, T, Y, p0, wdot, qdot);
         // Y equations
         for (int k=0; k<nsp; k++) {
             A.setZero();
@@ -214,6 +221,20 @@ int main()
             fout << "," << setprecision(6) << Y[k](j);
         }
         fout << endl;
+    }
+    // Output reactions related quantities (source terms)
+    rout << "x (m),Qdot (J/m3 s)";
+    for (int k=0; k<nsp; k++) {
+        rout << "," << gas.speciesName(k);
+    }
+    rout << endl;
+    for (int j=0; j<nx; j++) {
+        rout << setprecision(6) << x(j) << ","
+             << setprecision(6) << qdot(j);
+        for (int k=0; k<nsp; k++) {
+            rout << "," << setprecision(6) << wdot[k](j);
+        }
+        rout << endl;
     }
 
     return 0;

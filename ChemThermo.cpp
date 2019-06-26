@@ -20,6 +20,12 @@ double ChemThermo::ha(const double& p, const double& T, const int& k)
     return R*T*gas_.enthalpy_RT_ref()[k];
 }
 
+double ChemThermo::Hc(const int& k)
+{
+    gas_.setState_TP(Tstd, pstd);
+    return R*Tstd*gas_.enthalpy_RT_ref()[k]/gas_.molecularWeight(k);
+}
+
 double ChemThermo::cp(const double& p, const double& T, const int& k)
 {
     gas_.setState_TP(T, p);
@@ -55,7 +61,7 @@ void ChemThermo::calcT(Eigen::VectorXd& T,
         double y[nsp_];
         massFractions(Y, y, j);
 
-        // Newton iterative method
+        // Newton downhill
         double Test = T(j);
         double Tnew = T(j);
         double TnewS = T(j);

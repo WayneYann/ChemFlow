@@ -35,6 +35,9 @@ public:
     // Return thermodynamic enthalpy of specie k [J/kmol]
     double ha(const double& p, const double& T, const int& k);
 
+    // Return standard state heat of formation of specie k [J/kg]
+    double Hc(const int& k);
+
     // Return heat capacity of specie k [J/kmol K]
     double cp(const double& p, const double& T, const int& k);
 
@@ -42,15 +45,22 @@ public:
 
     std::string speciesName(const int& k) const;
 
-    void massFractions(const std::vector<Eigen::VectorXd>& Y, double* y, const int& j) const;
+    // Transfer mass fractions field into a single C array
+    // at point j for all species
+    void massFractions(const std::vector<Eigen::VectorXd>& Y,
+                       double* y, const int& j) const;
 
     double calcHs(const double& T, const double* y);
 
+    // Newton iterative method to calculate temperature
+    // with given sensible enthalpy and species mass fractions
     void calcT(Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y,
                const Eigen::VectorXd& hs);
 
+    // Transport properties based on Sutherland model
     double sutherland(const double& T) const;
 
+    // Update thermophysical properties
     void updateThermo(const Eigen::VectorXd& T,
                       const std::vector<Eigen::VectorXd>& Y,
                       const double Le, Eigen::VectorXd& rho,
@@ -64,6 +74,5 @@ private:
     int nsp_;
 
     double p0_;
-
 };
 #endif  // CTF_CHEMTHERMO_H_
