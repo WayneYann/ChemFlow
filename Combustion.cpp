@@ -50,8 +50,9 @@ void Combustion::solve(double* y, const double& p, const double& xEnd)
     thermo_.setState_TP(y[1], p);
     // sub-step
     double dx = (xEnd - xStart)/maxSteps_;
-    ode_.reinitialize();
     ode_.setInitialTime(xStart);
+    ode_.reinitialize();
+    ode_.setVerbose();
     ode_.setMaxTimeStep(dx);
     ode_.updateState(y);
 
