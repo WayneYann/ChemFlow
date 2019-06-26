@@ -1,105 +1,64 @@
-#include <stdexcept>
+#include <fstream>
 #include "Combustion.h"
 
-Combustion::Combustion(const ChemThermo& thermo)
-    : thermo_(thermo),
-      nsp_(thermo.nsp()),
-      c_(thermo.nsp(), 0.0),
-      c0_(thermo.nsp(), 0.0),
-      reactionRate_(thermo.nsp()),
-      maxSteps_(10000)
+Combustion::Combustion(const ChemThermo& chemThermo)
+    : thermo_(chemThermo.gas()),
+      nsp_(chemThermo.nsp()),
+      reactionRate_(chemThermo.nsp()),
+      maxSteps_(100),
+      react_(),
+      ode_()
 {
+    react_.setThermoMgr(thermo_);
+    ode_.addReactor(react_);
 }
 
-double Combustion::solve(const double& deltaT, const Eigen::VectorXd& T,
-                         const std::vector<Eigen::VectorXd>& Y,
-                         const Eigen::VectorXd& rho, const double& p0)
+void Combustion::solve(const double& deltaT, const Eigen::VectorXd& T,
+                       const std::vector<Eigen::VectorXd>& Y,
+                       const double& p0)
 {
-    double deltaTMin = 1e3;
-    double p = p0;
     for (int k=0; k<nsp_; k++) {
         reactionRate_[k].resize(T.size());
     }
-    deltaTChem_.resize(T.size());
 
     for (int j=0; j<T.size(); j++) {
-        double Tj = T(j);
-        const double rhoj = rho(j);
-        // Calculate molar concentrations [kmol/m3] and store initial values
-        for (int k=0; j<nsp_; k++) {
-            c_[k] = rhoj*Y[k](j)/thermo_.W(k);
-            c0_[k] = c_[k];
+        double y[nsp_+2], y0[nsp_+2];
+        y[0] = 1.0;
+        y0[0] = 1.0;
+        y[1] = T(j);
+        y0[1] = T(j);
+        for (int k=0; k<nsp_; k++) {
+            y[k+2] = Y[k](j);
+            y0[k+2] = Y[k](j);
         }
 
-        double timeLeft = deltaT;
-        while (timeLeft > 1e-10) {
-            double dt = timeLeft;
-            this->solve(c_, Tj, p, dt, deltaTChem_(j));
-            timeLeft -= dt;
-        }
-        deltaTMin = std::min(deltaTMin, deltaTChem_(j));
+        this->solve(y, p0, deltaT);
 
         for (int k=0; k<nsp_; k++) {
-            reactionRate_[k](j) = (c_[k] - c0_[k])*thermo_.W(k)/deltaT;
+            reactionRate_[k](j) = (y[k+2] - y0[k+2])/deltaT;
         }
     }
-    return deltaTMin;
+    Eigen::VectorXd::Index loc;
+    std::cout << "Max omega of " << thermo_.speciesName(11) << "   "
+              << reactionRate_[11].maxCoeff(&loc) << " @ position "
+              << loc << std::endl;
 }
 
-void Combustion::solve(std::vector<double>& c, double& T,
-                       double& p, const double& xEnd, double& dxTry) const
+void Combustion::solve(double* y, const double& p, const double& xEnd)
 {
-    std::vector<double> y(nsp_+2);
-    for (int k=0; k<nsp_; k++) {
-        y[k] = c[k];
-    }
-    y[nsp_] = T;
-    y[nsp_+1] = p;
-
-    // Start from x = 0.0
     const double xStart = 0.0;
+    thermo_.setState_TP(y[1], p);
+    // sub-step
+    double dx = (xEnd - xStart)/maxSteps_;
+    ode_.reinitialize();
+    ode_.setInitialTime(xStart);
+    ode_.setMaxTimeStep(dx);
+    ode_.updateState(y);
 
-    stepState step(dxTry);
-    double x = xStart;
-
-    int nStep=0;
-    for (; nStep<maxSteps_; nStep++) {
-        double dxTry0 = step.dxTry;
-        step.reject = false;
-
-        // Check if this is a truncated step
-        if ((x + step.dxTry - xEnd)*(x + step.dxTry - xStart) > 0) {
-            step.last = true;
-            step.dxTry = xEnd - x;
-        }
-
-        // Integrate as far as possible up to step.dxTry
-        solve(x, y, step);
-
-        // Check if reached xEnd
-        if ((x - xEnd)*(xEnd - xStart) >= 0) {
-            if (nStep>0 && step.last) {
-                step.dxTry = dxTry0;
-            }
-            dxTry = step.dxTry;
-            break;
-        }
-        step.first = false;
-        if (step.reject) {
-            step.prevReject = true;
-        }
+    for (int nStep=1; nStep<maxSteps_+1; nStep++) {
+        // Integrate up to x+dx*nStep
+        ode_.advance(xStart + dx*nStep);
     }
-    if (nStep >= maxSteps_) throw std::runtime_error("Maximum integration steps reached");
-
-    for (int k=0; k<nsp_; k++) {
-        c[k] = std::max(0.0, y[k]);
-    }
-    T = y[nsp_];
-    p = y[nsp_+1];
+    ode_.getState(y);
 }
-
-void Combustion::solve(double& x, std::vector<double>& y, stepState& step) const
-{
-}
-
 

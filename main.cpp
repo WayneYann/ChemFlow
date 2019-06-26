@@ -16,7 +16,7 @@ using namespace Eigen;
 int main()
 {
     // Discretize space and time
-    const int nx = 201;
+    const int nx = 101;
     const double XBEG = 0.0;
     const double XEND = 0.02;
     const double dx = (XEND - XBEG) / (nx - 1);
@@ -30,9 +30,9 @@ int main()
     const double a = 50.0;  // initial strain rate
     const double VL = a*0;
     const double VR = a*0;
-    const double TI = 300;
-    const double TL = 300;
-    const double TR = 300;
+    const double TI = 800;
+    const double TL = 800;
+    const double TR = 800;
     const double YO2Air = 0.23197;
     const double YN2Air = 0.75425;
     const double YARAir = 0.01378;
@@ -59,7 +59,10 @@ int main()
     vector<VectorXd> Y(nsp);  // species mass fractions [-]
     YL.resize(nsp, 0.0);
     YR.resize(nsp, 0.0);
-    YL[gas.speciesIndex("C2H5OH")] = YFUEL;
+    // YL[gas.speciesIndex("C2H5OH")] = YFUEL;
+    YL[gas.speciesIndex("O2")] = YO2Air;
+    YL[gas.speciesIndex("N2")] = YN2Air;
+    YL[gas.speciesIndex("AR")] = YARAir;
     YR[gas.speciesIndex("O2")] = YO2Air;
     YR[gas.speciesIndex("N2")] = YN2Air;
     YR[gas.speciesIndex("AR")] = YARAir;
@@ -109,9 +112,11 @@ int main()
         b.setZero();
         m.setZero();
         for (int j=1; j<nx-1; j++) {
-            A(j,j-1) = -mu(j)*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
-            A(j,j) = 1.0 + 2.0*dt*V(j) + 2.0*mu(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-            A(j,j+1) = -mu(j)*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
+            const double muL = 0.5*(mu(j)+mu(j-1));
+            const double muR = 0.5*(mu(j)+mu(j+1));
+            A(j,j-1) = -muL*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
+            A(j,j) = 1.0 + 2.0*dt*V(j) + muL*dt/(rho(j)*dx*dx) + muR*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
+            A(j,j+1) = -muR*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
             b(j) = lambda*dt + rho(j)*V(j);
         }
         A(0,0) = 1.0;
@@ -142,15 +147,18 @@ int main()
              << setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "
              << loc << endl;
 
+        combustion.solve(dt, T, Y, p0);
         // Y equations
         for (int k=0; k<nsp; k++) {
             A.setZero();
             b.setZero();
             m.setZero();
             for (int j=1; j<nx-1; j++) {
-                A(j,j-1) = -rho(j)*D(j)*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
-                A(j,j) = 1.0 + dt*V(j) + 2.0*rho(j)*D(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-                A(j,j+1) = -rho(j)*D(j)*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
+                const double rhoDL = 0.5*(rho(j)*D(j)+rho(j-1)*D(j-1));
+                const double rhoDR = 0.5*(rho(j)*D(j)+rho(j+1)*D(j+1));
+                A(j,j-1) = -rhoDL*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
+                A(j,j) = 1.0 + dt*V(j) + rhoDL*dt/(rho(j)*dx*dx) + rhoDR*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
+                A(j,j+1) = -rhoDR*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
                 b(j) = rho(j)*Y[k](j);
             }
             A(0,0) = 1.0;
@@ -169,9 +177,11 @@ int main()
         b.setZero();
         m.setZero();
         for (int j=1; j<nx-1; j++) {
-            A(j,j-1) = -rho(j)*alpha(j)*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
-            A(j,j) = 1.0 + dt*V(j) + 2.0*rho(j)*alpha(j)*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
-            A(j,j+1) = -rho(j)*alpha(j)*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
+            const double rhoAlphaL = 0.5*(rho(j)*alpha(j)+rho(j-1)*alpha(j-1));
+            const double rhoAlphaR = 0.5*(rho(j)*alpha(j)+rho(j+1)*alpha(j+1));
+            A(j,j-1) = -rhoAlphaL*dt/(rho(j-1)*dx*dx) + (u(j) > 0.0 ? -dt*u(j-1)/dx : 0.0);
+            A(j,j) = 1.0 + dt*V(j) + rhoAlphaL*dt/(rho(j)*dx*dx) + rhoAlphaR*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
+            A(j,j+1) = -rhoAlphaR*dt/(rho(j+1)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j+1)/dx);
             b(j) = rho(j)*hs(j);
         }
         A(0,0) = 1.0;

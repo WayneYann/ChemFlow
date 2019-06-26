@@ -13,12 +13,14 @@ int main()
     y << 1,3,5,
          4,9,7,
          5,2,8;
+    MatrixXd z(3);
+    cout << z.cols() << z.rows() << endl;
     // const double* a = y.data();
     // for (int i=0; i<y.size(); i++) {
     //     cout << a[i] << " ";
     // }
-    x = x.array() + 2.0;
-    cout << x << endl;
-    cout << endl;
+    // x = x.array() + 2.0;
+    // cout << x << endl;
+    // cout << endl;
     return 0;
 }

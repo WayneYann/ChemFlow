@@ -14,6 +14,18 @@ double ChemThermo::W(const int& k) const
     return gas_.molecularWeight(k);
 }
 
+double ChemThermo::ha(const double& p, const double& T, const int& k)
+{
+    gas_.setState_TP(T, p);
+    return R*T*gas_.enthalpy_RT_ref()[k];
+}
+
+double ChemThermo::cp(const double& p, const double& T, const int& k)
+{
+    gas_.setState_TP(T, p);
+    return R*gas_.cp_R_ref()[k];
+}
+
 int ChemThermo::speciesIndex(const std::string& name) const
 {
     return gas_.speciesIndex(name);
@@ -27,7 +39,7 @@ std::string ChemThermo::speciesName(const int& k) const
 double ChemThermo::calcHs(const double& T, const double* y)
 {
     // This order also serves the purpose of setting gas_ state(T, y)
-    gas_.setState_TPY(Tstd, p0_, y);
+    gas_.setState_TPY(Tstd, pstd, y);
     const double h0 = gas_.enthalpy_mass();
     gas_.setState_TPY(T, p0_, y);
     const double ha = gas_.enthalpy_mass();
@@ -46,7 +58,7 @@ void ChemThermo::calcT(Eigen::VectorXd& T,
         // Newton iterative method
         double Test = T(j);
         double Tnew = T(j);
-        double TnewS = T(j);  // damped value
+        double TnewS = T(j);
         double Ttol = T(j)*1e-04;
         double fx, alpha;
         int iter = 0;
@@ -61,9 +73,10 @@ void ChemThermo::calcT(Eigen::VectorXd& T,
                 alpha /= 2.0;
                 TnewS = alpha*Tnew + (1.0-alpha)*Test;
             }
-            ++iter;
-        } while ((std::abs(Tnew - Test) > Ttol) && (iter < 100));
-        if (iter >= 100) throw std::runtime_error("Maximum iterations reached");
+            if (iter++ > 100) {
+                throw std::runtime_error("Maximum iterations reached");
+            }
+        } while (std::abs(Tnew - Test) > Ttol);
         T(j) = Tnew;
     }
 }

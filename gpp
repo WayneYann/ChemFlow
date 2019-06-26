@@ -1,2 +1,2 @@
 #!/bin/sh
-g++ main.cpp tdma.cpp ChemThermo.cpp Combustion.cpp -I/usr/include/eigen3 -I/opt/cantera/include -L/opt/cantera/lib -lcantera -pthread -llapack -lblas
+g++ main.cpp tdma.cpp ChemThermo.cpp Combustion.cpp -I/usr/include/eigen3 -I/opt/cantera/include -L/opt/cantera/lib -lcantera -pthread -llapack -lblas -lsundials_cvodes -lsundials_nvecserial
