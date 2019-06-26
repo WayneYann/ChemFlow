@@ -43,6 +43,7 @@ int main()
 
     // Output
     ofstream fout("output.csv");
+    ofstream omegaOut("omegaOut.csv");
     const size_t WIDTH = 18;
 
     // Solution and initial conditions

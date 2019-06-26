@@ -9,7 +9,7 @@ Combustion::Combustion(const ChemThermo& chemThermo)
       react_(),
       ode_()
 {
-    react_.setThermoMgr(thermo_);
+    react_.insert(thermo_);
     ode_.addReactor(react_);
 }
 
@@ -48,11 +48,11 @@ void Combustion::solve(double* y, const double& p, const double& xEnd)
 {
     const double xStart = 0.0;
     thermo_.setState_TP(y[1], p);
+    react_.syncState();
     // sub-step
     double dx = (xEnd - xStart)/maxSteps_;
     ode_.setInitialTime(xStart);
     ode_.reinitialize();
-    ode_.setVerbose();
     ode_.setMaxTimeStep(dx);
     ode_.updateState(y);
 
