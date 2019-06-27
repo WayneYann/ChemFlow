@@ -1,67 +1,46 @@
 #ifndef CTF_CHEMTHERMO_H_
 #define CTF_CHEMTHERMO_H_
-
-#include <string>
 #include <vector>
 #include <Eigen/Dense>
-#include "cantera/thermo.h"
-#include "cantera/IdealGasMix.h"
-#include "cantera/thermo/IdealGasPhase.h"
+#include "fvCFD.H"
+#include "rhoReactionThermo.H"
+#include "BasicChemistryModel.H"
+#include "reactingMixture.H"
+#include "chemistrySolver.H"
+#include "OFstream.H"
+#include "thermoPhysicsTypes.H"
+#include "basicSpecieMixture.H"
+#include "cellModeller.H"
 
-const double R = 8314.47;  // [J/kmol K]
-const double Tstd = 298.15;  // [K]
-const double pstd = 101325.0;  // [Pa]
 
-// Wrapper class for Cantera IdealGasMix with Sutherland transport
+// Wrapper class for OpenFOAM BasicChemistryModel<rhoReactionThermo>
 class ChemThermo
 {
 public:
-    ChemThermo(const std::string& inputFile, const double& p0);
-    ChemThermo() = default;
+    ChemThermo(Foam::fvMesh& mesh, Foam::Time& runTime, const double& p0);
 
     ChemThermo& operator=(const ChemThermo&) = delete;
-
-    Cantera::IdealGasMix gas() const {
-        return gas_;
-    }
 
     int nsp() const {
         return nsp_;
     }
 
-    // Molecular weight [kg/kmol]
-    double W(const int& k) const;
-
-    // Return thermodynamic enthalpy of specie k [J/kmol]
-    double ha(const double& p, const double& T, const int& k);
-
-    // Return standard state heat of formation of specie k [J/kg]
-    double Hc(const int& k);
-
-    // Return heat capacity of specie k [J/kmol K]
-    double cp(const double& p, const double& T, const int& k);
-
     int speciesIndex(const std::string& name) const;
 
     std::string speciesName(const int& k) const;
+
+    double calcHs(const double& T, const double* y) const;
+
+    void calcT(Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y,
+               const Eigen::VectorXd& hs);
 
     // Transfer mass fractions field into a single C array
     // at point j for all species
     void massFractions(const std::vector<Eigen::VectorXd>& Y,
                        double* y, const int& j) const;
 
-    double calcHs(const double& T, const double* y);
-
-    // Newton iterative method to calculate temperature
-    // with given sensible enthalpy and species mass fractions
-    void calcT(Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y,
-               const Eigen::VectorXd& hs);
-
-    // Transport properties based on Sutherland model
-    double sutherland(const double& T) const;
-
     // Update thermophysical properties
-    void updateThermo(const Eigen::VectorXd& T,
+    void updateThermo(const Eigen::VectorXd& hs,
                       const std::vector<Eigen::VectorXd>& Y,
                       const double Le, Eigen::VectorXd& rho,
                       Eigen::VectorXd& mu, Eigen::VectorXd& kappa,
@@ -69,10 +48,18 @@ public:
 
 
 private:
-    Cantera::IdealGasMix gas_;
+    void setY(const double* y);
+
+    Foam::autoPtr<Foam::rhoReactionThermo> pThermo_;
+    Foam::rhoReactionThermo& thermo_;
+    Foam::autoPtr<Foam::BasicChemistryModel<Foam::rhoReactionThermo>> pChemistry_;
+    Foam::volScalarField rho_;
+    Foam::volVectorField U_;
+    Foam::BasicChemistryModel<Foam::rhoReactionThermo>& chemistry_;
+    Foam::basicSpecieMixture& composition_;
+    Foam::PtrList<Foam::volScalarField>& Y_;
 
     int nsp_;
-
     double p0_;
 };
 #endif  // CTF_CHEMTHERMO_H_

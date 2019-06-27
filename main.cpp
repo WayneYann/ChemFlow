@@ -8,22 +8,18 @@
 
 #include "tdma.h"
 #include "ChemThermo.h"
-#include "Combustion.h"
 
-using namespace std;
-using namespace Eigen;
-
-int main()
+int main(int argc, char *argv[])
 {
     // Discretize space and time
     const int nx = 101;
     const double XBEG = 0.0;
     const double XEND = 0.02;
     const double dx = (XEND - XBEG) / (nx - 1);
-    VectorXd x(nx);
-    const int nt = 401;
+    Eigen::VectorXd x(nx);
+    const int nt = 2001;
     const double TBEG = 0.0;
-    const double TEND = 0.2;
+    const double TEND = 0.1;
     const double dt = (TEND - TBEG) / (nt - 1);
 
     // BC
@@ -37,13 +33,13 @@ int main()
     const double YN2Air = 0.75425;
     const double YARAir = 0.01378;
     const double YFUEL = 1.0;
-    vector<double> YL;
-    vector<double> YR;
+    std::vector<double> YL;
+    std::vector<double> YR;
 
 
     // Output
-    ofstream fout("output.csv");
-    ofstream rout("reactionOut.csv");
+    std::ofstream fout("output.csv");
+    std::ofstream rout("reactionOut.csv");
     const size_t WIDTH = 18;
 
     // Solution and initial conditions
@@ -52,16 +48,16 @@ int main()
     const double rhoInf = 1.173;
     const double lambda = rhoInf*a*a;  // -1/y*dp/dy [Pa/m2]
     const double p0 = 101325.0;
-    ChemThermo gas("Ethanol_31.cti", p0);
-    Combustion combustion(gas);
+    #include "createFields.H"
+    ChemThermo gas(mesh, runTime, p0);
     const int nsp = gas.nsp();  // number of species
-    VectorXd u(nx);  // x-direction velocity [m/s]
-    VectorXd V(nx);  // v/y = dv/dy [1/s]
-    VectorXd T(nx);  // temperature [K]
-    VectorXd hs(nx);  // sensible enthalpy [J/kg]
-    vector<VectorXd> Y(nsp);  // species mass fractions [-]
-    vector<VectorXd> wdot(nsp);  // reaction rates [kg/m3 s]
-    VectorXd qdot(nx);  // heat source [J/m3 s]
+    Eigen::VectorXd u(nx);  // x-direction velocity [m/s]
+    Eigen::VectorXd V(nx);  // v/y = dv/dy [1/s]
+    Eigen::VectorXd T(nx);  // temperature [K]
+    Eigen::VectorXd hs(nx);  // sensible enthalpy [J/kg]
+    std::vector<Eigen::VectorXd> Y(nsp);  // species mass fractions [-]
+    std::vector<Eigen::VectorXd> wdot(nsp);  // reaction rates [kg/m3 s]
+    Eigen::VectorXd qdot(nx);  // heat source [J/m3 s]
     YL.resize(nsp, 0.0);
     YR.resize(nsp, 0.0);
     YL[gas.speciesIndex("C2H5OH")] = YFUEL;
@@ -93,25 +89,25 @@ int main()
 
     // Properties
     const double Le = 1.0;
-    VectorXd rho(nx);
-    VectorXd rhoPrev(nx);
-    VectorXd mu(nx);
-    VectorXd kappa(nx);
-    VectorXd alpha(nx);
-    VectorXd D(nx);
-    gas.updateThermo(T, Y, Le, rho, mu, kappa, alpha, D);
+    Eigen::VectorXd rho(nx);
+    Eigen::VectorXd rhoPrev(nx);
+    Eigen::VectorXd mu(nx);
+    Eigen::VectorXd kappa(nx);
+    Eigen::VectorXd alpha(nx);
+    Eigen::VectorXd D(nx);
+    gas.updateThermo(hs, Y, Le, rho, mu, kappa, alpha, D);
     rhoPrev = rho;
 
 
     // Time marching
     clock_t startTime, endTime;
-    startTime = clock();
-    MatrixXd A(nx,nx);
-    MatrixXd b(nx,1);
-    VectorXd m(nx);  // conservative form for continuity equation
-    VectorXd::Index loc;
+    startTime = std::clock();
+    Eigen::MatrixXd A(nx,nx);
+    Eigen::MatrixXd b(nx,1);
+    Eigen::VectorXd m(nx);  // conservative form for continuity equation
+    Eigen::VectorXd::Index loc;
     for (int i=0; i<nt; i++) {
-        cout << "Time =  " << TBEG+i*dt << setprecision(4) << endl;
+        std::cout << "Time =  " << TBEG+i*dt << std::setprecision(4) << std::endl;
  
         // V equation
         A.setZero();
@@ -129,9 +125,9 @@ int main()
         b(0) = VL;
         b(nx-1) = VR;
         V = tdma(A,b);
-        cout << setw(WIDTH) << "V.max "
-             << setw(WIDTH/2) << V.maxCoeff(&loc) << " @ position "
-             << loc << endl;
+        std::cout << std::setw(WIDTH) << "V.max "
+             << std::setw(WIDTH/2) << V.maxCoeff(&loc) << " @ position "
+             << loc << std::endl;
 
         // Continuity equation
         // Propagate from left to right
@@ -145,11 +141,11 @@ int main()
         const double rhouOffset = (-rho(0)*m(nx-1) - rho(nx-1)*m(0)) / (rho(0) + rho(nx-1));
         m = m.array() + rhouOffset;
         u = m.cwiseQuotient(rho);
-        cout << setw(WIDTH) << "u.max "
-             << setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "
-             << loc << endl;
+        std::cout << std::setw(WIDTH) << "u.max "
+             << std::setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "
+             << loc << std::endl;
 
-        combustion.solve(dt, T, Y, p0, wdot, qdot);
+        // gas.solve(dt, T, Y, p0, wdot, qdot);
         // Y equations
         for (int k=0; k<nsp; k++) {
             A.setZero();
@@ -160,16 +156,16 @@ int main()
                 A(j,j-1) = -rhoDl*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
                 A(j,j) = 1.0 + rhoDl*dt/(rho(j)*dx*dx) + rhoDr*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
                 A(j,j+1) = -rhoDr*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-                b(j) = Y[k](j);
+                b(j) = Y[k](j) + dt*wdot[k](j)/rho(j);
             }
             A(0,0) = 1.0;
             A(nx-1,nx-1) = 1.0;
             b(0) = YL[k];
             b(nx-1) = YR[k];
             Y[k] = tdma(A,b);
-            cout << setw(WIDTH) << "Y-" + gas.speciesName(k) + ".max "
-                 << setw(WIDTH/2) << Y[k].maxCoeff(&loc) << " @ position "
-                 << loc << endl;
+            std::cout << std::setw(WIDTH) << "Y-" + gas.speciesName(k) + ".max "
+                 << std::setw(WIDTH/2) << Y[k].maxCoeff(&loc) << " @ position "
+                 << loc << std::endl;
         }
 
         // Energy eqaution
@@ -181,27 +177,34 @@ int main()
             A(j,j-1) = -rhoAlphal*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
             A(j,j) = 1.0 + rhoAlphal*dt/(rho(j)*dx*dx) + rhoAlphar*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
             A(j,j+1) = -rhoAlphar*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-            b(j) = hs(j);
+            b(j) = hs(j) + dt*qdot(j)/rho(j);
         }
         A(0,0) = 1.0;
         A(nx-1,nx-1) = 1.0;
         b(0) = hsL;
         b(nx-1) = hsR;
+        // Ignition
+        // if (i>2000 && i<3000) {
+        //     A(nx/2,nx/2-1) = 0.0;
+        //     A(nx/2,nx/2) = 1.0;
+        //     A(nx/2,nx/2+1) = 0.0;
+        //     b(nx/2) = 1e6;
+        // }
         hs = tdma(A,b);
         gas.calcT(T, Y, hs);
-        cout << setw(WIDTH) << "T.max "
-             << setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
-             << loc << endl;
+        std::cout << std::setw(WIDTH) << "T.max "
+             << std::setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
+             << loc << std::endl;
 
         rhoPrev = rho;
-        gas.updateThermo(T, Y, Le, rho, mu, kappa, alpha, D);
+        gas.updateThermo(hs, Y, Le, rho, mu, kappa, alpha, D);
 
-        cout << endl;
+        std::cout << std::endl;
     }
-    cout << "End" << endl;
-    endTime = clock();
-    cout << "Run time   " << double(endTime - startTime) / CLOCKS_PER_SEC
-         << setprecision(6) << " s" << endl;
+    std::cout << "End" << std::endl;
+    endTime = std::clock();
+    std::cout << "Run time   " << double(endTime - startTime) / CLOCKS_PER_SEC
+         << std::setprecision(6) << " s" << std::endl;
 
 
     // Output
@@ -209,32 +212,32 @@ int main()
     for (int k=0; k<nsp; k++) {
         fout << "," << gas.speciesName(k);
     }
-    fout << endl;
+    fout << std::endl;
     for (int j=0; j<nx; j++) {
-        fout << setprecision(6) << x(j) << ","
-             << setprecision(6) << u(j) << ","
-             << setprecision(6) << V(j) << ","
-             << setprecision(6) << rho(j) << ","
-             << setprecision(6) << D(j) << ","
-             << setprecision(6) << T(j);
+        fout << std::setprecision(6) << x(j) << ","
+             << std::setprecision(6) << u(j) << ","
+             << std::setprecision(6) << V(j) << ","
+             << std::setprecision(6) << rho(j) << ","
+             << std::setprecision(6) << D(j) << ","
+             << std::setprecision(6) << T(j);
         for (int k=0; k<nsp; k++) {
-            fout << "," << setprecision(6) << Y[k](j);
+            fout << "," << std::setprecision(6) << Y[k](j);
         }
-        fout << endl;
+        fout << std::endl;
     }
     // Output reactions related quantities (source terms)
     rout << "x (m),Qdot (J/m3 s)";
     for (int k=0; k<nsp; k++) {
         rout << "," << gas.speciesName(k);
     }
-    rout << endl;
+    rout << std::endl;
     for (int j=0; j<nx; j++) {
-        rout << setprecision(6) << x(j) << ","
-             << setprecision(6) << qdot(j);
+        rout << std::setprecision(6) << x(j) << ","
+             << std::setprecision(6) << qdot(j);
         for (int k=0; k<nsp; k++) {
-            rout << "," << setprecision(6) << wdot[k](j);
+            rout << "," << std::setprecision(6) << wdot[k](j);
         }
-        rout << endl;
+        rout << std::endl;
     }
 
     return 0;

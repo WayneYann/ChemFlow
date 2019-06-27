@@ -1,2 +1,0 @@
-#!/bin/sh
-g++ canteraTest.cpp ../ChemThermo.cpp -I/usr/include/eigen3 -I/opt/cantera/include -L/opt/cantera/lib -lcantera -pthread -llapack -lblas
