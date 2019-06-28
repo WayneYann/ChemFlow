@@ -5,7 +5,14 @@ import matplotlib
 
 #Files
 figname = '1'
-filename = ['reactionOut.csv']
+print("Enter file names:")
+filename = []
+while True:
+    name_input = input('> ')
+    if name_input == '':
+        break
+    else:
+        filename.append(name_input)
 
 #Basic settings
 figs = (14,9)
@@ -14,8 +21,6 @@ linew = 2
 plt.rcParams['font.family'] = 'serif'
 from matplotlib import rc
 plt.rcParams['mathtext.fontset'] = 'stix'
-#plt.style.use('ggplot')
-#plt.grid(True, color='k',ls='--',linewidth=0.6)
 
 #Plot data
 file = filename[0]
