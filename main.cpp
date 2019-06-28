@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <iomanip>
 #include <ctime>
@@ -8,6 +9,50 @@
 
 #include "tdma.h"
 #include "ChemThermo/ChemThermo.h"
+
+void write(const double& time, const ChemThermo& gas, const Eigen::VectorXd& x,
+           const Eigen::VectorXd& u, const Eigen::VectorXd& V,
+           const Eigen::VectorXd& rho, const Eigen::VectorXd& D,
+           const Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y,
+           const Eigen::VectorXd& qdot, const std::vector<Eigen::VectorXd>& wdot)
+{
+    std::stringstream ss;
+    ss << time;
+    std::ofstream fout("output-"+ss.str()+".csv");
+    std::ofstream rout("reaction-"+ss.str()+".csv");
+    // Output
+    fout << "x (m),u (m/s),V (1/s),rho (kg/m3),D (m2/s2),T (K)";
+    for (int k=0; k<gas.nsp(); k++) {
+        fout << "," << gas.speciesName(k);
+    }
+    fout << std::endl;
+    for (int j=0; j<x.size(); j++) {
+        fout << std::setprecision(6) << x(j) << ","
+             << std::setprecision(6) << u(j) << ","
+             << std::setprecision(6) << V(j) << ","
+             << std::setprecision(6) << rho(j) << ","
+             << std::setprecision(6) << D(j) << ","
+             << std::setprecision(6) << T(j);
+        for (int k=0; k<gas.nsp(); k++) {
+            fout << "," << std::setprecision(6) << Y[k](j);
+        }
+        fout << std::endl;
+    }
+    // Output reactions related quantities (source terms)
+    rout << "x (m),Qdot (J/m3 s)";
+    for (int k=0; k<gas.nsp(); k++) {
+        rout << "," << gas.speciesName(k);
+    }
+    rout << std::endl;
+    for (int j=0; j<x.size(); j++) {
+        rout << std::setprecision(6) << x(j) << ","
+             << std::setprecision(6) << qdot(j);
+        for (int k=0; k<gas.nsp(); k++) {
+            rout << "," << std::setprecision(6) << wdot[k](j);
+        }
+        rout << std::endl;
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -41,8 +86,6 @@ int main(int argc, char *argv[])
 
 
     // Output
-    std::ofstream fout("output.csv");
-    std::ofstream rout("reactionOut.csv");
     const size_t WIDTH = 18;
 
     // Solution and initial conditions
@@ -109,6 +152,7 @@ int main(int argc, char *argv[])
     Eigen::MatrixXd b(nx,1);
     Eigen::VectorXd m(nx);  // conservative form for continuity equation
     Eigen::VectorXd::Index loc;
+    int iter = 0;
     while (true) {
         // V equation
         A.setZero();
@@ -207,46 +251,13 @@ int main(int argc, char *argv[])
         dt = std::min(dtChem, dtMax);
         if (time+tprecision > TEND) break;
         if (time+dt > TEND) dt = TEND - time;
+        if (iter++%1000 == 0) write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
         std::cout << std::endl;
     }
     std::cout << "End" << std::endl;
     endTime = std::clock();
     std::cout << "Run time   " << double(endTime - startTime) / CLOCKS_PER_SEC
               << std::setprecision(6) << " s" << std::endl;
-
-
-    // Output
-    fout << "x (m),u (m/s),V (1/s),rho (kg/m3),D (m2/s2),T (K)";
-    for (int k=0; k<nsp; k++) {
-        fout << "," << gas.speciesName(k);
-    }
-    fout << std::endl;
-    for (int j=0; j<nx; j++) {
-        fout << std::setprecision(6) << x(j) << ","
-             << std::setprecision(6) << u(j) << ","
-             << std::setprecision(6) << V(j) << ","
-             << std::setprecision(6) << rho(j) << ","
-             << std::setprecision(6) << D(j) << ","
-             << std::setprecision(6) << T(j);
-        for (int k=0; k<nsp; k++) {
-            fout << "," << std::setprecision(6) << Y[k](j);
-        }
-        fout << std::endl;
-    }
-    // Output reactions related quantities (source terms)
-    rout << "x (m),Qdot (J/m3 s)";
-    for (int k=0; k<nsp; k++) {
-        rout << "," << gas.speciesName(k);
-    }
-    rout << std::endl;
-    for (int j=0; j<nx; j++) {
-        rout << std::setprecision(6) << x(j) << ","
-             << std::setprecision(6) << qdot(j);
-        for (int k=0; k<nsp; k++) {
-            rout << "," << std::setprecision(6) << wdot[k](j);
-        }
-        rout << std::endl;
-    }
 
     return 0;
 }
