@@ -15,41 +15,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     NO;
-
-startFrom       startTime;
-
-startTime       0;
-
-stopAt          endTime;
-
-endTime         0.001;
-
-deltaT          1e-07;
-
-maxDeltaT       1e-03;
-
-adjustTimeStep  on;
+deltaT          1e10;
 
 writeControl    adjustableRunTime;
 
-writeInterval   5e-5;
-
-purgeWrite      0;
+writeInterval   1e10;
 
 writeFormat     ascii;
-
-writeCompression off;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable yes;
-
-DebugSwitches
-{
-    SolverPerformance   0;
-}
 
 // ************************************************************************* //

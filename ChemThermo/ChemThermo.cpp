@@ -18,6 +18,42 @@ ChemThermo::ChemThermo(fvMesh& mesh, Time& runTime, const double& p0)
           ),
           thermo_.rho()
       ),
+      mu_
+      (
+          IOobject
+          (
+              "mu",
+              runTime.timeName(),
+              mesh,
+              IOobject::NO_READ,
+              IOobject::AUTO_WRITE
+          ),
+          thermo_.mu()
+      ),
+      kappa_
+      (
+          IOobject
+          (
+              "kappa",
+              runTime.timeName(),
+              mesh,
+              IOobject::NO_READ,
+              IOobject::AUTO_WRITE
+          ),
+          thermo_.kappa()
+      ),
+      alphahe_
+      (
+          IOobject
+          (
+              "alphahe",
+              runTime.timeName(),
+              mesh,
+              IOobject::NO_READ,
+              IOobject::AUTO_WRITE
+          ),
+          thermo_.alphahe()
+      ),
       U_
       (
           IOobject
@@ -95,15 +131,12 @@ void ChemThermo::updateThermo(const Eigen::VectorXd& hs,
         thermo_.p() = dimensionedScalar("p", dimPressure, p0_);
         thermo_.he() = dimensionedScalar("h", dimEnergy/dimMass, hs(j));
         thermo_.correct();
+        syncState();
 
-        const scalarField rhoC = thermo_.rho();
-        const scalarField muC = thermo_.mu();
-        const scalarField kappaC = thermo_.kappa();
-        const scalarField alphaheC = thermo_.alphahe();
-        rho(j) = rhoC[0];
-        mu(j) = muC[0];
-        kappa(j) = kappaC[0];
-        alpha(j) = alphaheC[0] / rho(j);
+        rho(j) = rho_[0];
+        mu(j) = mu_[0];
+        kappa(j) = kappa_[0];
+        alpha(j) = alphahe_[0] / rho(j);
         D(j) = alpha(j) / Le;
     }
 }
@@ -113,4 +146,12 @@ void ChemThermo::setY(const double* y)
     for (int k=0; k<nsp_; k++) {
         Y_[k] = y[k];
     }
+}
+
+void ChemThermo::syncState()
+{
+    rho_ = thermo_.rho();
+    mu_ = thermo_.mu();
+    kappa_ = thermo_.kappa();
+    alphahe_ = thermo_.alphahe();
 }

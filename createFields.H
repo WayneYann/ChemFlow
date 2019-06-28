@@ -1,3 +1,5 @@
+// Create a single cell mesh to hold OpenFOAM thermo
+// Note that the actual geometry does not affect anything
 Foam::argList args(argc, argv);
 Foam::Time runTime(Foam::Time::controlDictName, args);
 Foam::labelList owner(6, Foam::label(0));
@@ -18,82 +20,82 @@ Foam::faceList faces = hexa.modelFaces();
 
 Foam::fvMesh mesh
 (
- Foam::IOobject
- (
-     fvMesh::defaultRegion,
-     runTime.timeName(),
-     runTime,
-     IOobject::READ_IF_PRESENT
- ),
- Foam::xferMove<Foam::Field<Foam::vector>>(points),
- faces.xfer(),
- owner.xfer(),
- neighbour.xfer()
+    Foam::IOobject
+    (
+        fvMesh::defaultRegion,
+        runTime.timeName(),
+        runTime,
+        IOobject::READ_IF_PRESENT
+    ),
+    Foam::xferMove<Foam::Field<Foam::vector>>(points),
+    faces.xfer(),
+    owner.xfer(),
+    neighbour.xfer()
 );
 
 Foam::List<Foam::polyPatch*> patches(1);
 
 patches[0] = new Foam::emptyPolyPatch
 (
- "boundary",
- 6,
- 0,
- 0,
- mesh.boundaryMesh(),
- Foam::emptyPolyPatch::typeName
+    "boundary",
+    6,
+    0,
+    0,
+    mesh.boundaryMesh(),
+    Foam::emptyPolyPatch::typeName
 );
 
 mesh.addFvPatches(patches);
 
 {
- volScalarField Ydefault
- (
-     IOobject
-     (
-         "Ydefault",
-         runTime.timeName(),
-         mesh,
-         IOobject::READ_IF_PRESENT,
-         IOobject::NO_WRITE,
-         false
-     ),
-     mesh,
-     dimensionedScalar("Ydefault", dimless, 1)
- );
+    Foam::volScalarField Ydefault
+    (
+        Foam::IOobject
+        (
+            "Ydefault",
+            runTime.timeName(),
+            mesh,
+            Foam::IOobject::READ_IF_PRESENT,
+            Foam::IOobject::NO_WRITE,
+            false
+        ),
+        mesh,
+        Foam::dimensionedScalar("Ydefault", dimless, 0)
+    );
 
- Ydefault.write();
+    Ydefault.write();
 
- volScalarField p
- (
-     IOobject
-     (
-         "p",
-         runTime.timeName(),
-         mesh,
-         IOobject::READ_IF_PRESENT,
-         IOobject::NO_WRITE,
-         false
-     ),
-     mesh,
-     dimensionedScalar("p", dimPressure, p0)
- );
+    Foam::volScalarField p
+    (
+        Foam::IOobject
+        (
+            "p",
+            runTime.timeName(),
+            mesh,
+            Foam::IOobject::READ_IF_PRESENT,
+            Foam::IOobject::NO_WRITE,
+            false
+        ),
+        mesh,
+        Foam::dimensionedScalar("p", dimPressure, 0)
+    );
 
- p.write();
+    p.write();
 
- volScalarField T
- (
-     IOobject
-     (
-         "T",
-         runTime.timeName(),
-         mesh,
-         IOobject::READ_IF_PRESENT,
-         IOobject::NO_WRITE,
-         false
-     ),
-     mesh,
-     dimensionedScalar("T", dimTemperature, 300.0)
- );
+    Foam::volScalarField T
+    (
+        Foam::IOobject
+        (
+            "T",
+            runTime.timeName(),
+            mesh,
+            Foam::IOobject::READ_IF_PRESENT,
+            Foam::IOobject::NO_WRITE,
+            false
+        ),
+        mesh,
+        Foam::dimensionedScalar("T", dimTemperature, 0)
+    );
 
- T.write();
+    T.write();
 }

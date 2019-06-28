@@ -7,7 +7,7 @@
 #include <Eigen/Dense>
 
 #include "tdma.h"
-#include "ChemThermo.h"
+#include "ChemThermo/ChemThermo.h"
 
 int main(int argc, char *argv[])
 {
@@ -17,9 +17,9 @@ int main(int argc, char *argv[])
     const double XEND = 0.02;
     const double dx = (XEND - XBEG) / (nx - 1);
     Eigen::VectorXd x(nx);
-    const int nt = 2001;
+    const int nt = 1001;
     const double TBEG = 0.0;
-    const double TEND = 0.1;
+    const double TEND = 0.2;
     const double dt = (TEND - TBEG) / (nt - 1);
 
     // BC
@@ -100,6 +100,7 @@ int main(int argc, char *argv[])
 
 
     // Time marching
+    // TODO: adjustable time step
     clock_t startTime, endTime;
     startTime = std::clock();
     Eigen::MatrixXd A(nx,nx);
@@ -126,8 +127,8 @@ int main(int argc, char *argv[])
         b(nx-1) = VR;
         V = tdma(A,b);
         std::cout << std::setw(WIDTH) << "V.max "
-             << std::setw(WIDTH/2) << V.maxCoeff(&loc) << " @ position "
-             << loc << std::endl;
+                  << std::setw(WIDTH/2) << V.maxCoeff(&loc) << " @ position "
+                  << loc << std::endl;
 
         // Continuity equation
         // Propagate from left to right
@@ -142,8 +143,8 @@ int main(int argc, char *argv[])
         m = m.array() + rhouOffset;
         u = m.cwiseQuotient(rho);
         std::cout << std::setw(WIDTH) << "u.max "
-             << std::setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "
-             << loc << std::endl;
+                  << std::setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "
+                  << loc << std::endl;
 
         // gas.solve(dt, T, Y, p0, wdot, qdot);
         // Y equations
@@ -164,8 +165,8 @@ int main(int argc, char *argv[])
             b(nx-1) = YR[k];
             Y[k] = tdma(A,b);
             std::cout << std::setw(WIDTH) << "Y-" + gas.speciesName(k) + ".max "
-                 << std::setw(WIDTH/2) << Y[k].maxCoeff(&loc) << " @ position "
-                 << loc << std::endl;
+                      << std::setw(WIDTH/2) << Y[k].maxCoeff(&loc) << " @ position "
+                      << loc << std::endl;
         }
 
         // Energy eqaution
@@ -193,8 +194,8 @@ int main(int argc, char *argv[])
         hs = tdma(A,b);
         gas.calcT(T, Y, hs);
         std::cout << std::setw(WIDTH) << "T.max "
-             << std::setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
-             << loc << std::endl;
+                  << std::setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
+                  << loc << std::endl;
 
         rhoPrev = rho;
         gas.updateThermo(hs, Y, Le, rho, mu, kappa, alpha, D);
@@ -204,7 +205,7 @@ int main(int argc, char *argv[])
     std::cout << "End" << std::endl;
     endTime = std::clock();
     std::cout << "Run time   " << double(endTime - startTime) / CLOCKS_PER_SEC
-         << std::setprecision(6) << " s" << std::endl;
+              << std::setprecision(6) << " s" << std::endl;
 
 
     // Output
