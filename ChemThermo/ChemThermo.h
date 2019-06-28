@@ -50,6 +50,11 @@ public:
                       Eigen::VectorXd& mu, Eigen::VectorXd& kappa,
                       Eigen::VectorXd& alpha, Eigen::VectorXd& D);
 
+    // Solve the stiff chemistry and return the chemical time scale
+    double solve(const double& deltaT, const Eigen::VectorXd& hs,
+                 const std::vector<Eigen::VectorXd>& Y,
+                 std::vector<Eigen::VectorXd>& wdot, Eigen::VectorXd& qdot);
+
 
 private:
     void setY(const double* y);

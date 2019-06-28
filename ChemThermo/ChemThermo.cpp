@@ -141,6 +141,28 @@ void ChemThermo::updateThermo(const Eigen::VectorXd& hs,
     }
 }
 
+double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
+                         const std::vector<Eigen::VectorXd>& Y,
+                         std::vector<Eigen::VectorXd>& wdot, Eigen::VectorXd& qdot)
+{
+    double tc = 1.0;
+    for (int j=0; j<hs.size(); j++) {
+        double y[nsp_];
+        massFractions(Y, y, j);
+        setY(y);
+        thermo_.p() = dimensionedScalar("p", dimPressure, p0_);
+        thermo_.he() = dimensionedScalar("h", dimEnergy/dimMass, hs(j));
+        thermo_.correct();
+
+        tc = min(tc, chemistry_.solve(deltaT));
+        qdot(j) = chemistry_.Qdot()()[0];
+        for (int k=0; k<nsp_; k++) {
+            wdot[k](j) = chemistry_.RR(k)[0];
+        }
+    }
+    return tc;
+}
+
 void ChemThermo::setY(const double* y)
 {
     for (int k=0; k<nsp_; k++) {

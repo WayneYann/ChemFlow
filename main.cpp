@@ -12,16 +12,16 @@
 int main(int argc, char *argv[])
 {
     // Discretize space and time
-    const int nx = 101;
+    const int nx = 201;
     const double XBEG = 0.0;
     const double XEND = 0.02;
     const double dx = (XEND - XBEG) / (nx - 1);
     Eigen::VectorXd x(nx);
     const double TBEG = 0.0;
     const double TEND = 0.2;
-    const double dtMax = 1e-4;
+    const double dtMax = 0.5e-4;
     const double tprecision = 1e-10;
-    double dtChem = 1e-4;  // initial chemical time scale
+    double dtChem = 0.5e-4;  // initial chemical time scale
     double dt = dtChem;
     double time = TBEG;
 
@@ -127,11 +127,12 @@ int main(int argc, char *argv[])
         b(nx-1) = VR;
         V = tdma(A,b);
         std::cout << std::setw(WIDTH) << "V.max "
-                  << std::setw(WIDTH/2) << V.maxCoeff(&loc) << " @ position "
+                  << std::setw(WIDTH) << V.maxCoeff(&loc) << " @ position "
                   << loc << std::endl;
 
         // Continuity equation
         // Propagate from left to right
+        // TODO: limit drhodt
         m.setZero();
         m(0) = rho(0) * u(0);
         for (int j=1; j<nx; j++) {
@@ -143,10 +144,10 @@ int main(int argc, char *argv[])
         m = m.array() + rhouOffset;
         u = m.cwiseQuotient(rho);
         std::cout << std::setw(WIDTH) << "u.max "
-                  << std::setw(WIDTH/2) << u.maxCoeff(&loc) << " @ position "
+                  << std::setw(WIDTH) << u.maxCoeff(&loc) << " @ position "
                   << loc << std::endl;
 
-        // gas.solve(dt, T, Y, p0, wdot, qdot);
+        dtChem = gas.solve(dt, hs, Y, wdot, qdot);
         // Y equations
         for (int k=0; k<nsp; k++) {
             A.setZero();
@@ -165,7 +166,7 @@ int main(int argc, char *argv[])
             b(nx-1) = YR[k];
             Y[k] = tdma(A,b);
             std::cout << std::setw(WIDTH) << "Y-" + gas.speciesName(k) + ".max "
-                      << std::setw(WIDTH/2) << Y[k].maxCoeff(&loc) << " @ position "
+                      << std::setw(WIDTH) << Y[k].maxCoeff(&loc) << " @ position "
                       << loc << std::endl;
         }
 
@@ -185,16 +186,16 @@ int main(int argc, char *argv[])
         b(0) = hsL;
         b(nx-1) = hsR;
         // Ignition
-        // if (i>2000 && i<3000) {
-        //     A(nx/2,nx/2-1) = 0.0;
-        //     A(nx/2,nx/2) = 1.0;
-        //     A(nx/2,nx/2+1) = 0.0;
-        //     b(nx/2) = 1e6;
-        // }
+        if (time > 0.05 && time < 0.07) {
+            A(nx/2,nx/2-1) = 0.0;
+            A(nx/2,nx/2) = 1.0;
+            A(nx/2,nx/2+1) = 0.0;
+            b(nx/2) = 2e6;
+        }
         hs = tdma(A,b);
         gas.calcT(T, Y, hs);
         std::cout << std::setw(WIDTH) << "T.max "
-                  << std::setw(WIDTH/2) << T.maxCoeff(&loc) << " @ position "
+                  << std::setw(WIDTH) << T.maxCoeff(&loc) << " @ position "
                   << loc << std::endl;
 
         rhoPrev = rho;
