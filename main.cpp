@@ -17,10 +17,13 @@ int main(int argc, char *argv[])
     const double XEND = 0.02;
     const double dx = (XEND - XBEG) / (nx - 1);
     Eigen::VectorXd x(nx);
-    const int nt = 1001;
     const double TBEG = 0.0;
     const double TEND = 0.2;
-    const double dt = (TEND - TBEG) / (nt - 1);
+    const double dtMax = 1e-4;
+    const double tprecision = 1e-10;
+    double dtChem = 1e-4;  // initial chemical time scale
+    double dt = dtChem;
+    double time = TBEG;
 
     // BC
     const double a = 50.0;  // prescribed strain rate
@@ -100,16 +103,13 @@ int main(int argc, char *argv[])
 
 
     // Time marching
-    // TODO: adjustable time step
     clock_t startTime, endTime;
     startTime = std::clock();
     Eigen::MatrixXd A(nx,nx);
     Eigen::MatrixXd b(nx,1);
     Eigen::VectorXd m(nx);  // conservative form for continuity equation
     Eigen::VectorXd::Index loc;
-    for (int i=0; i<nt; i++) {
-        std::cout << "Time =  " << TBEG+i*dt << std::setprecision(4) << std::endl;
- 
+    while (true) {
         // V equation
         A.setZero();
         b.setZero();
@@ -200,6 +200,12 @@ int main(int argc, char *argv[])
         rhoPrev = rho;
         gas.updateThermo(hs, Y, Le, rho, mu, kappa, alpha, D);
 
+        time += dt;
+        // Adjustable time step according to chemical time scale
+        std::cout << "Time =  " << time << std::setprecision(6) << std::endl;
+        dt = std::min(dtChem, dtMax);
+        if (time+tprecision > TEND) break;
+        if (time+dt > TEND) dt = TEND - time;
         std::cout << std::endl;
     }
     std::cout << "End" << std::endl;

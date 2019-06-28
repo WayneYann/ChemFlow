@@ -60,7 +60,7 @@ mesh.addFvPatches(patches);
             false
         ),
         mesh,
-        Foam::dimensionedScalar("Ydefault", dimless, 0)
+        Foam::dimensionedScalar("Ydefault", dimless, 1)
     );
 
     Ydefault.write();
@@ -77,7 +77,7 @@ mesh.addFvPatches(patches);
             false
         ),
         mesh,
-        Foam::dimensionedScalar("p", dimPressure, 0)
+        Foam::dimensionedScalar("p", dimPressure, 101325)
     );
 
     p.write();
@@ -94,7 +94,7 @@ mesh.addFvPatches(patches);
             false
         ),
         mesh,
-        Foam::dimensionedScalar("T", dimTemperature, 0)
+        Foam::dimensionedScalar("T", dimTemperature, 300)
     );
 
     T.write();
