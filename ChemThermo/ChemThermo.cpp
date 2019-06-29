@@ -155,9 +155,11 @@ double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
         thermo_.correct();
 
         tc = min(tc, chemistry_.solve(deltaT));
-        qdot(j) = chemistry_.Qdot()()[0];
+        // qdot(j) = chemistry_.Qdot()()[0];
+        qdot(j) = 0.0;
         for (int k=0; k<nsp_; k++) {
             wdot[k](j) = chemistry_.RR(k)[0];
+            qdot(j) -= composition_.Hc(k)*wdot[k](j);
         }
     }
     return tc;

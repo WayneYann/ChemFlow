@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
     Eigen::VectorXd qdot(nx);  // heat source [J/m3 s]
     YL.resize(nsp, 0.0);
     YR.resize(nsp, 0.0);
-    YL[gas.speciesIndex("C2H5OH")] = YFUEL;
+    YL[gas.speciesIndex("CH4")] = YFUEL;
     YR[gas.speciesIndex("O2")] = YO2Air;
     YR[gas.speciesIndex("N2")] = YN2Air;
     YR[gas.speciesIndex("AR")] = YARAir;
@@ -157,6 +157,7 @@ int main(int argc, char *argv[])
     Eigen::VectorXd::Index loc;
     int iter = 0;
     while (true) {
+        if (iter++%1000 == 0) write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
         // V equation
         A.setZero();
         b.setZero();
@@ -254,7 +255,6 @@ int main(int argc, char *argv[])
         dt = std::min(dtChem, dtMax);
         if (time+tprecision > TEND) break;
         if (time+dt > TEND) dt = TEND - time;
-        if (iter++%1000 == 0) write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
         std::cout << std::endl;
     }
     std::cout << "End" << std::endl;
