@@ -39,7 +39,7 @@ for i,file in enumerate(filename):
     data = np.transpose(data)
     x = data[0]
     for k in range(len(name)):
-        if k in [9,10,12,13]:
+        if k in [2,7,9,10,18,19,20]:
             ax1.plot(x,data[k],label=name[k],ls='-',lw=linew)
     ax2.plot(x,data[1],label=name[1],ls='-',c='k',lw=linew+1)
 

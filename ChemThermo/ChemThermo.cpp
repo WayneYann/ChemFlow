@@ -156,9 +156,15 @@ double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
 
         tc = min(tc, chemistry_.solve(deltaT));
         // qdot(j) = chemistry_.Qdot()()[0];
-        qdot(j) = 0.0;
         for (int k=0; k<nsp_; k++) {
             wdot[k](j) = chemistry_.RR(k)[0];
+        }
+    }
+    this->filter(wdot);
+    // Compute qdot
+    for (int j=0; j<hs.size(); j++) {
+        qdot(j) = 0.0;
+        for (int k=0; k<nsp_; k++) {
             qdot(j) -= composition_.Hc(k)*wdot[k](j);
         }
     }
@@ -178,4 +184,22 @@ void ChemThermo::syncState()
     mu_ = thermo_.mu();
     kappa_ = thermo_.kappa();
     alphahe_ = thermo_.alphahe();
+}
+
+void ChemThermo::filter(std::vector<Eigen::VectorXd>& wdot) const
+{
+    std::vector<Eigen::VectorXd> wdotOrig(nsp_);
+    for (int k=0; k<nsp_; k++) {
+        wdotOrig[k].resize(wdot[k].size());
+        for (int j=0; j<wdotOrig[k].size(); j++) {
+            wdotOrig[k](j) = wdot[k](j);
+        }
+    }
+    // 3-point averaging
+    for (int k=0; k<nsp_; k++) {
+        for (int j=1; j<wdot[k].size()-1; j++) {
+            wdot[k][j] = 0.333*wdotOrig[k][j-1]
+                        + 0.333*wdotOrig[k][j] + 0.333*wdotOrig[k][j+1];
+        }
+    }
 }

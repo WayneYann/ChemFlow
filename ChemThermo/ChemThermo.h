@@ -61,6 +61,8 @@ private:
 
     void syncState();
 
+    void filter(std::vector<Eigen::VectorXd>& wdot) const;
+
     Foam::autoPtr<Foam::rhoReactionThermo> pThermo_;
     Foam::rhoReactionThermo& thermo_;
     Foam::autoPtr<Foam::BasicChemistryModel<Foam::rhoReactionThermo>> pChemistry_;
