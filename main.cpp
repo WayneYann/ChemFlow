@@ -89,6 +89,8 @@ int main(int argc, char *argv[])
 
 
     // Output
+    std::ofstream fm("monitor.csv");
+    fm << "time (s),temperature (K)" << std::endl;
     const size_t WIDTH = 18;
 
     // Solution and initial conditions
@@ -157,7 +159,9 @@ int main(int argc, char *argv[])
     Eigen::VectorXd::Index loc;
     int iter = 0;
     while (true) {
-        if (iter++%1000 == 0) write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
+        if (iter++%5000 == 0) write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
+        fm << std::setprecision(10) << time << ","
+           << std::setprecision(10) << T(nx/2) << std::endl;
         // V equation
         A.setZero();
         b.setZero();
@@ -252,7 +256,7 @@ int main(int argc, char *argv[])
             A(nx/2,nx/2-1) = 0.0;
             A(nx/2,nx/2) = 1.0;
             A(nx/2,nx/2+1) = 0.0;
-            b(nx/2) = 2e6;
+            b(nx/2) = 1.5e6;
         }
         hs = tdma(A,b);
         gas.calcT(T, Y, hs);
@@ -275,6 +279,7 @@ int main(int argc, char *argv[])
     endTime = std::clock();
     std::cout << "Run time   " << double(endTime - startTime) / CLOCKS_PER_SEC
               << std::setprecision(6) << " s" << std::endl;
+    write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
 
     return 0;
 }

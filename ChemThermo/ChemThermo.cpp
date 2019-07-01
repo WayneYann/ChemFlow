@@ -160,7 +160,7 @@ double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
             wdot[k](j) = chemistry_.RR(k)[0];
         }
     }
-    // this->filter(wdot);
+    this->filter(wdot);
     // Compute qdot
     for (int j=0; j<hs.size(); j++) {
         qdot(j) = 0.0;
@@ -195,11 +195,12 @@ void ChemThermo::filter(std::vector<Eigen::VectorXd>& wdot) const
             wdotOrig[k](j) = wdot[k](j);
         }
     }
-    // 3-point averaging
+    // 5-point averaging
     for (int k=0; k<nsp_; k++) {
-        for (int j=1; j<wdot[k].size()-1; j++) {
-            wdot[k][j] = 0.25*wdotOrig[k][j-1]
-                        + 0.5*wdotOrig[k][j] + 0.25*wdotOrig[k][j+1];
+        for (int j=2; j<wdot[k].size()-2; j++) {
+            wdot[k][j] = 0.08*wdotOrig[k](j-2) + 0.17*wdotOrig[k](j-1)
+                        + 0.5*wdotOrig[k](j)
+                        + 0.17*wdotOrig[k](j+1) + 0.08*wdotOrig[k](j+2);
         }
     }
 }
