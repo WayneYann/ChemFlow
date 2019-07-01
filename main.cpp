@@ -184,10 +184,10 @@ int main(int argc, char *argv[])
         m.setZero();
         m(0) = rho(0) * u(0);
         for (int j=1; j<nx; j++) {
-            double drhodt0 = (rho(j-1) - rhoPrev(j-1))/dt;
-            double drhodt1 = (rho(j) - rhoPrev(j))/dt;
-            drhodt0 = (dt > 5e-6 ? drhodt0 : 0.0);
-            drhodt1 = (dt > 5e-6 ? drhodt1 : 0.0);
+            double drhodt0 = (1e10*(rho(j-1) - rhoPrev(j-1)))/(1e10*dt);
+            double drhodt1 = (1e10*(rho(j) - rhoPrev(j)))/(1e10*dt);
+            drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
+            drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
             m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) - 0.5*(rho(j-1)*V(j-1)+rho(j)*V(j)));
         }
         const double rhouOffset = (-rho(0)*m(nx-1) - rho(nx-1)*m(0)) / (rho(0) + rho(nx-1));
@@ -200,7 +200,6 @@ int main(int argc, char *argv[])
         dtChem = gas.solve(dt, hs, Y, wdot, qdot);
         // Y equations
         for (int k=0; k<nsp; k++) {
-            if (k==gas.speciesIndex("N2")) continue;
             A.setZero();
             b.setZero();
             for (int j=1; j<nx-1; j++) {
@@ -222,18 +221,16 @@ int main(int argc, char *argv[])
         }
         // Correct
         for (int j=0; j<nx; j++) {
-            double excs = 0.0;
+            double sumY = 0.0;
             for (int k=0; k<nsp; k++) {
-                if (k==gas.speciesIndex("N2")) continue;
                 Y[k](j) = (Y[k](j) > 0.0 ? Y[k](j) : 0.0);
                 Y[k](j) = (Y[k](j) < 1.0 ? Y[k](j) : 1.0);
-                excs += Y[k](j);
+                sumY += Y[k](j);
             }
-            Y[gas.speciesIndex("N2")](j) = 1.0 - excs;
+            for (int k=0; k<nsp; k++) {
+                Y[k](j) /= sumY;
+            }
         }
-        std::cout << std::setw(WIDTH) << "Y-" + gas.speciesName(gas.speciesIndex("N2")) + ".max "
-                  << std::setw(WIDTH) << Y[gas.speciesIndex("N2")].maxCoeff(&loc) << " @ position "
-                  << loc << std::endl;
 
         // Energy eqaution
         A.setZero();
@@ -251,7 +248,7 @@ int main(int argc, char *argv[])
         b(0) = hsL;
         b(nx-1) = hsR;
         // Ignition
-        if (time > 0.05 && time < 0.06) {
+        if (time > 0.04 && time < 0.045) {
             A(nx/2,nx/2-1) = 0.0;
             A(nx/2,nx/2) = 1.0;
             A(nx/2,nx/2+1) = 0.0;
