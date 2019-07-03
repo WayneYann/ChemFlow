@@ -10,8 +10,66 @@
 #include <string>
 #include <Eigen/Dense>
 
+#include "lininterp.h"
 #include "tdma.h"
 #include "ChemThermo/ChemThermo.h"
+
+void restore(const ChemThermo& gas, const Eigen::VectorXd& x,
+             Eigen::VectorXd& u, Eigen::VectorXd& V,
+             Eigen::VectorXd& T, Eigen::VectorXd& hs,
+             std::vector<Eigen::VectorXd>& Y)
+{
+    std::vector<double> x0;
+    std::vector<double> u0;
+    std::vector<double> V0;
+    std::vector<double> T0;
+    std::vector<std::vector<double> > Y0(gas.nsp());
+    std::ifstream fin("initial_solution.csv");
+    std::string line, str;
+    std::getline(fin, line);
+    if ((std::count(line.begin(),line.end(),',')+1) != gas.nsp()+6)
+        throw std::runtime_error("Input x,u,V,rho,D,T,Y0,...,Ynsp-1");
+    while (std::getline(fin, line)) {
+        int n = 0;
+        std::istringstream buffer(line);
+        while(std::getline(buffer, str, ',')) {
+            switch (n) {
+                case 0:
+                    x0.push_back(std::stod(str));
+                    break;
+                case 1:
+                    u0.push_back(std::stod(str));
+                    break;
+                case 2:
+                    V0.push_back(std::stod(str));
+                    break;
+                case 3:
+                    break;
+                case 4:
+                    break;
+                case 5:
+                    T0.push_back(std::stod(str));
+                    break;
+                default:
+                    Y0[n-6].push_back(std::stod(str));
+                    break;
+            }
+            ++n;
+        }
+    }
+
+    for (int j=0; j<x.size(); j++) {
+        u(j) = lininterp(x(j), x0, u0);
+        V(j) = lininterp(x(j), x0, V0);
+        T(j) = lininterp(x(j), x0, T0);
+        for (int k=0; k<gas.nsp(); k++) {
+            Y[k](j) = lininterp(x(j), x0, Y0[k]);
+        }
+        double y[gas.nsp()];
+        gas.massFractions(Y, y, j);
+        hs(j) = gas.calcHs(T(j), y);
+    }
+}
 
 void write(const double& time, const ChemThermo& gas, const Eigen::VectorXd& x,
            const Eigen::VectorXd& u, const Eigen::VectorXd& V,
