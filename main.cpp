@@ -14,6 +14,10 @@
 #include "tdma.h"
 #include "ChemThermo/ChemThermo.h"
 
+const double numlimSmall = 1e-8;
+const double numlimSmallSmall = 1e-14;
+const double numlimGreat = 1e12;
+
 void restore(const ChemThermo& gas, const Eigen::VectorXd& x,
              Eigen::VectorXd& u, Eigen::VectorXd& V,
              Eigen::VectorXd& T, Eigen::VectorXd& hs,
@@ -125,12 +129,11 @@ int main(int argc, char *argv[])
     Eigen::VectorXd x(nx);
     const double TBEG = 0.0;
     const double TEND = 0.2;
-    const double dtMax = 0.5e-4;
-    const double tprecision = 1e-10;
-    double dtChem = 0.5e-4;  // initial chemical time scale
+    const double dtMax = 5e-05;
+    const double tprecision = numlimSmall;
+    double dtChem = 2e-06;  // initial chemical time scale
     double dt = dtChem;
     double time = TBEG;
-
     // BC
     const double a = 50.0;  // prescribed strain rate
     const double VL = a*0;
@@ -144,6 +147,12 @@ int main(int argc, char *argv[])
     const double YFUEL = 1.0;
     std::vector<double> YL;
     std::vector<double> YR;
+    // IC
+    const bool ign = true;
+    const int writeFreq = 5000;
+    const double ignBEGt = 0.05;
+    const double ignENDt = 0.07;
+    const double ignHs = 2e06;
 
 
     // Output
@@ -154,7 +163,7 @@ int main(int argc, char *argv[])
     // Solution and initial conditions
     // Both std::vector and Eigen::VectorXd are used for the purpose of
     // distinguishing between containers for species and spatial grid points
-    const double rhoInf = 1.173;
+    const double rhoInf = 1.1768;
     const double lambda = rhoInf*a*a;  // -1/y*dp/dy [Pa/m2]
     const double p0 = 101325.0;
     #include "createFields.H"
@@ -217,7 +226,7 @@ int main(int argc, char *argv[])
     Eigen::VectorXd::Index loc;
     int iter = 0;
     while (true) {
-        if (iter++%5000 == 0) write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
+        if (iter++%writeFreq == 0) write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
         fm << std::setprecision(10) << time << ","
            << std::setprecision(10) << T(nx/2) << std::endl;
         // V equation
@@ -246,8 +255,8 @@ int main(int argc, char *argv[])
         m.setZero();
         m(0) = rho(0) * u(0);
         for (int j=1; j<nx; j++) {
-            double drhodt0 = (1e10*(rho(j-1) - rhoPrev(j-1)))/(1e10*dt);
-            double drhodt1 = (1e10*(rho(j) - rhoPrev(j)))/(1e10*dt);
+            double drhodt0 = (numlimGreat*(rho(j-1) - rhoPrev(j-1)))/(numlimGreat*dt);
+            double drhodt1 = (numlimGreat*(rho(j) - rhoPrev(j)))/(numlimGreat*dt);
             drhodt0 = (dt > tprecision ? drhodt0 : 0.0);
             drhodt1 = (dt > tprecision ? drhodt1 : 0.0);
             m(j) = m(j-1) + dx*(-0.5*(drhodt0+drhodt1) - 0.5*(rho(j-1)*V(j-1)+rho(j)*V(j)));
@@ -310,11 +319,11 @@ int main(int argc, char *argv[])
         b(0) = hsL;
         b(nx-1) = hsR;
         // Ignition
-        if (time > 0.04 && time < 0.045) {
+        if (ign && time > ignBEGt && time < ignENDt) {
             A(nx/2,nx/2-1) = 0.0;
             A(nx/2,nx/2) = 1.0;
             A(nx/2,nx/2+1) = 0.0;
-            b(nx/2) = 1.5e6;
+            b(nx/2) = ignHs;
         }
         hs = tdma(A,b);
         gas.calcT(T, Y, hs);

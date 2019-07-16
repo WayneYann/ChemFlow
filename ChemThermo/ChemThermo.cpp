@@ -160,7 +160,7 @@ double ChemThermo::solve(const double& deltaT, const Eigen::VectorXd& hs,
             wdot[k](j) = chemistry_.RR(k)[0];
         }
     }
-    this->filter(wdot);
+    // this->filter(wdot);
     // Compute qdot
     for (int j=0; j<hs.size(); j++) {
         qdot(j) = 0.0;
