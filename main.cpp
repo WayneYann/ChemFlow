@@ -1,4 +1,5 @@
 // ChemFlow
+// -- StrainedChemFlow
 // -- A Segregated Solution to the Quasi-1D Counterflow Flame
 // -- xu-zhang@sjtu.edu.cn
 #include <iostream>
@@ -6,8 +7,10 @@
 #include <fstream>
 #include <iomanip>
 #include <ctime>
+#include <stdexcept>
 #include <vector>
 #include <string>
+#include <map>
 #include <Eigen/Dense>
 
 #include "lininterp.h"
@@ -39,23 +42,23 @@ void restore(const ChemThermo& gas, const Eigen::VectorXd& x,
         while(std::getline(buffer, str, ',')) {
             switch (n) {
                 case 0:
-                    x0.push_back(std::stod(str));
+                    x0.push_back(std::stold(str));
                     break;
                 case 1:
-                    u0.push_back(std::stod(str));
+                    u0.push_back(std::stold(str));
                     break;
                 case 2:
-                    V0.push_back(std::stod(str));
+                    V0.push_back(std::stold(str));
                     break;
                 case 3:
                     break;
                 case 4:
                     break;
                 case 5:
-                    T0.push_back(std::stod(str));
+                    T0.push_back(std::stold(str));
                     break;
                 default:
-                    Y0[n-6].push_back(std::stod(str));
+                    Y0[n-6].push_back(std::stold(str));
                     break;
             }
             ++n;
@@ -75,6 +78,50 @@ void restore(const ChemThermo& gas, const Eigen::VectorXd& x,
     }
 }
 
+void write(const int& iter, const ChemThermo& gas, const Eigen::VectorXd& x,
+           const Eigen::VectorXd& u, const Eigen::VectorXd& V,
+           const Eigen::VectorXd& rho, const Eigen::VectorXd& D,
+           const Eigen::VectorXd& T, const std::vector<Eigen::VectorXd>& Y,
+           const Eigen::VectorXd& qdot, const std::vector<Eigen::VectorXd>& wdot)
+{
+    std::stringstream ss;
+    ss << iter;
+    std::ofstream fout("data/output-"+ss.str()+".csv");
+    std::ofstream rout("data/reaction-"+ss.str()+".csv");
+    // Output
+    fout << "x (m),u (m/s),V (1/s),rho (kg/m3),D (m2/s2),T (K)";
+    for (int k=0; k<gas.nsp(); k++) {
+        fout << "," << gas.speciesName(k);
+    }
+    fout << std::endl;
+    for (int j=0; j<x.size(); j++) {
+        fout << std::setprecision(8) << x(j) << ","
+             << std::setprecision(8) << u(j) << ","
+             << std::setprecision(8) << V(j) << ","
+             << std::setprecision(8) << rho(j) << ","
+             << std::setprecision(8) << D(j) << ","
+             << std::setprecision(8) << T(j);
+        for (int k=0; k<gas.nsp(); k++) {
+            fout << "," << std::setprecision(8) << Y[k](j);
+        }
+        fout << std::endl;
+    }
+    // Output reactions related quantities (source terms)
+    rout << "x (m),Qdot (J/m3 s)";
+    for (int k=0; k<gas.nsp(); k++) {
+        rout << "," << gas.speciesName(k);
+    }
+    rout << std::endl;
+    for (int j=0; j<x.size(); j++) {
+        rout << std::setprecision(6) << x(j) << ","
+             << std::setprecision(6) << qdot(j);
+        for (int k=0; k<gas.nsp(); k++) {
+            rout << "," << std::setprecision(6) << wdot[k](j);
+        }
+        rout << std::endl;
+    }
+}
+
 void write(const double& time, const ChemThermo& gas, const Eigen::VectorXd& x,
            const Eigen::VectorXd& u, const Eigen::VectorXd& V,
            const Eigen::VectorXd& rho, const Eigen::VectorXd& D,
@@ -83,8 +130,8 @@ void write(const double& time, const ChemThermo& gas, const Eigen::VectorXd& x,
 {
     std::stringstream ss;
     ss << time;
-    std::ofstream fout("output-"+ss.str()+".csv");
-    std::ofstream rout("reaction-"+ss.str()+".csv");
+    std::ofstream fout("data/output-"+ss.str()+".csv");
+    std::ofstream rout("data/reaction-"+ss.str()+".csv");
     // Output
     fout << "x (m),u (m/s),V (1/s),rho (kg/m3),D (m2/s2),T (K)";
     for (int k=0; k<gas.nsp(); k++) {
@@ -92,14 +139,14 @@ void write(const double& time, const ChemThermo& gas, const Eigen::VectorXd& x,
     }
     fout << std::endl;
     for (int j=0; j<x.size(); j++) {
-        fout << std::setprecision(6) << x(j) << ","
-             << std::setprecision(6) << u(j) << ","
-             << std::setprecision(6) << V(j) << ","
-             << std::setprecision(6) << rho(j) << ","
-             << std::setprecision(6) << D(j) << ","
-             << std::setprecision(6) << T(j);
+        fout << std::setprecision(8) << x(j) << ","
+             << std::setprecision(8) << u(j) << ","
+             << std::setprecision(8) << V(j) << ","
+             << std::setprecision(8) << rho(j) << ","
+             << std::setprecision(8) << D(j) << ","
+             << std::setprecision(8) << T(j);
         for (int k=0; k<gas.nsp(); k++) {
-            fout << "," << std::setprecision(6) << Y[k](j);
+            fout << "," << std::setprecision(8) << Y[k](j);
         }
         fout << std::endl;
     }
@@ -121,51 +168,65 @@ void write(const double& time, const ChemThermo& gas, const Eigen::VectorXd& x,
 
 int main(int argc, char *argv[])
 {
+    // input
+    std::ifstream finp("input.txt");
+    if (!finp) throw std::runtime_error("input.txt NOT FOUND!");
+    std::map<std::string, std::string> dict;
+    std::string name;
+    std::string value;
+    while (finp >> name) {
+        finp >> value;
+        dict[name] = value;
+    }
     // Discretize space and time
-    const int nx = 201;
-    const double XBEG = 0.0;
-    const double XEND = 0.02;
-    const double dx = (XEND - XBEG) / (nx - 1);
-    Eigen::VectorXd x(nx);
-    const double TBEG = 0.0;
-    const double TEND = 0.2;
-    const double dtMax = 5e-05;
-    const double tprecision = numlimSmall;
-    double dtChem = 2e-06;  // initial chemical time scale
-    double dt = dtChem;
-    double time = TBEG;
+    const int nx = std::stoi(dict["nPoints"]);
+    const double XBEG = std::stod(dict["XBEG"]);
+    const double XEND = std::stod(dict["XEND"]);
+    const double TBEG = std::stod(dict["TBEG"]);
+    const double TEND = std::stod(dict["TEND"]);
+    const double dtMax = std::stod(dict["dtMax"]);
     // BC
-    const double a = 50.0;  // prescribed strain rate
+    double a = std::stod(dict["strainRate"]);  // prescribed strain rate
     const double VL = a*0;
     const double VR = a*0;
-    const double TI = 300;
-    const double TL = 300;
-    const double TR = 300;
+    const double TI = std::stod(dict["TI"]);
+    const double TL = std::stod(dict["TL"]);
+    const double TR = std::stod(dict["TR"]);
     const double YO2Air = 0.23197;
     const double YN2Air = 0.75425;
     const double YARAir = 0.01378;
     const double YFUEL = 1.0;
     std::vector<double> YL;
     std::vector<double> YR;
+    std::string FUELNAME = dict["fuelName"];
     // IC
-    const bool ign = true;
-    const int writeFreq = 5000;
-    const double ignBEGt = 0.05;
-    const double ignENDt = 0.07;
-    const double ignHs = 2e06;
+    const bool rstr = (dict["restore"] == "true" ? true : false);
+    const bool ign = (dict["ignition"] == "true" ? true : false);
+    const bool strain = (dict["strain"] == "true" ? true : false);
+    const double ignBEGt = std::stod(dict["ignBEGt"]);
+    const double ignENDt = std::stod(dict["ignENDt"]);
+    const double ignHs = std::stod(dict["ignHs"]);
+    const double aBEG = std::stod(dict["aBEG"]);
+    const double aEND = std::stod(dict["aEND"]);
+    const int writeFreq = std::stoi(dict["writeFreq"]);
+    const double rhoInf = std::stod(dict["rhoInf"]);
+    const double p0 = std::stod(dict["pressure"]);
 
+    const double dx = (XEND - XBEG) / (nx - 1);
+    const double tprecision = numlimSmall;
+    Eigen::VectorXd x(nx);
+    double dtChem = 1e-6;  // initial chemical time scale
+    double dt = dtChem;
+    double time = TBEG;
 
     // Output
-    std::ofstream fm("monitor.csv");
+    std::ofstream fm("data/monitor.csv");
     fm << "time (s),temperature (K)" << std::endl;
     const size_t WIDTH = 18;
 
     // Solution and initial conditions
     // Both std::vector and Eigen::VectorXd are used for the purpose of
     // distinguishing between containers for species and spatial grid points
-    const double rhoInf = 1.1768;
-    const double lambda = rhoInf*a*a;  // -1/y*dp/dy [Pa/m2]
-    const double p0 = 101325.0;
     #include "createFields.H"
     ChemThermo gas(mesh, runTime, p0);
     const int nsp = gas.nsp();  // number of species
@@ -178,7 +239,7 @@ int main(int argc, char *argv[])
     Eigen::VectorXd qdot(nx);  // heat source [J/m3 s]
     YL.resize(nsp, 0.0);
     YR.resize(nsp, 0.0);
-    YL[gas.speciesIndex("CH4")] = YFUEL;
+    YL[gas.speciesIndex(FUELNAME)] = YFUEL;
     YR[gas.speciesIndex("O2")] = YO2Air;
     YR[gas.speciesIndex("N2")] = YN2Air;
     YR[gas.speciesIndex("AR")] = YARAir;
@@ -205,6 +266,7 @@ int main(int argc, char *argv[])
         qdot(j) = 0.0;
     }
 
+    if (rstr) restore(gas, x, u, V, T, hs, Y);
     // Properties
     const double Le = 1.0;
     Eigen::VectorXd rho(nx);
@@ -226,9 +288,15 @@ int main(int argc, char *argv[])
     Eigen::VectorXd::Index loc;
     int iter = 0;
     while (true) {
-        if (iter++%writeFreq == 0) write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
+        if (strain) {
+            a = aBEG + (aEND-aBEG)/(TEND-TBEG)*(time-TBEG);  // strain the flame
+            if (iter++%writeFreq == 0) write(iter, gas, x, u, V, rho, D, T, Y, qdot, wdot);
+            //sleep(1);
+        } else if (iter++%writeFreq == 0) {
+            write(time, gas, x, u, V, rho, D, T, Y, qdot, wdot);
+        }
         fm << std::setprecision(10) << time << ","
-           << std::setprecision(10) << T(nx/2) << std::endl;
+           << std::setprecision(10) << T.maxCoeff(&loc) << std::endl;
         // V equation
         A.setZero();
         b.setZero();
@@ -238,7 +306,7 @@ int main(int argc, char *argv[])
             A(j,j-1) = -mul*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? -dt*u(j)/dx : 0.0);
             A(j,j) = 1.0 + dt*V(j) + mul*dt/(rho(j)*dx*dx) + mur*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? dt*u(j)/dx : -dt*u(j)/dx);
             A(j,j+1) = -mur*dt/(rho(j)*dx*dx) + (u(j) > 0.0 ? 0.0 : dt*u(j)/dx);
-            b(j) = lambda*dt/rho(j) + V(j);
+            b(j) = rhoInf*a*a*dt/rho(j) + V(j);
         }
         A(0,0) = 1.0;
         A(nx-1,nx-1) = 1.0;
@@ -251,7 +319,6 @@ int main(int argc, char *argv[])
 
         // Continuity equation
         // Propagate from left to right
-        // TODO: limit drhodt
         m.setZero();
         m(0) = rho(0) * u(0);
         for (int j=1; j<nx; j++) {
@@ -336,7 +403,7 @@ int main(int argc, char *argv[])
 
         time += dt;
         // Adjustable time step according to chemical time scale
-        std::cout << "Time =  " << time << std::setprecision(6) << std::endl;
+        std::cout << "Time =  " << time << std::setprecision(10) << std::endl;
         dt = std::min(dtChem, dtMax);
         if (time+tprecision > TEND) break;
         if (time+dt > TEND) dt = TEND - time;
