@@ -198,7 +198,7 @@ int main(int argc, char *argv[])
     const double YFUEL = 1.0;
     std::vector<double> YL;
     std::vector<double> YR;
-    std::string FUELNAME = dict["fuelName"];
+    const std::string FUELNAME = dict["fuelName"];
     // IC
     const bool rstr = (dict["restore"] == "true" ? true : false);
     const bool ign = (dict["ignition"] == "true" ? true : false);
